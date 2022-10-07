@@ -13,7 +13,7 @@ classdef RozumPulse75 < handle
 
             
             self.GetRozumPulse75();
-            self.model.plot(zeros(1,self.model.n), 'workspace', self.workspace, 'scale', 0.5);
+            self.model.plot(zeros(1,self.model.n), 'workspace', self.workspace, 'scale', 0.3);
 
 
             self.PlotRozum();
@@ -40,13 +40,13 @@ classdef RozumPulse75 < handle
             L5 = Link('d',171/1000,'a',0,'alpha',pi/2,'qlim',deg2rad([-180 180]), 'offset',0); 
             L6 = Link('d',122.6/1000,'a',0,'alpha',0,'qlim',deg2rad([-180 180]), 'offset',0); 
 
-            self.model = SerialLink([L1,L2],'name',name);
+            self.model = SerialLink([L1,L2,L3,L4,L5,L6],'name',name);
 
             self.model.base = eye(4);
         end
         function PlotRozum(self)
             for linkIndex = 0:self.model.n
-                display(['Link',num2str(linkIndex),'.ply']);
+                %display(['Link',num2str(linkIndex),'.ply']);
                 [ faceData, vertexData, plyData{linkIndex + 1} ] = plyread(['Link',num2str(linkIndex),'.ply'],'tri'); %#ok<AGROW>                
                 self.model.faces{linkIndex + 1} = faceData;
                 self.model.points{linkIndex + 1} = vertexData;
