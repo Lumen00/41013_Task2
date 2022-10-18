@@ -9,7 +9,7 @@ hold on;
 % - Visual servoing
 % - System stop
 % - Collision detectiono
-% - GUI Movement
+% - GUI Movement/Controller Movement
 % - Colour Rozum Pulse 75
 % - Plan meal packaging
     % + Bagging vs... 
@@ -19,12 +19,61 @@ hold on;
     % + Passing between robots
     % + Handover to customer/driver
 
+
+%% Plot Critical Points
+
+% Handover point - where bag is passed between robots.
+
+
+% Dropoff point - where Dobot releases bag for collection.
+
+
+% Cutlery points:
+    % Cutlery pickup point - where Rozum collects cutlery package.
+
+    % Cutlery dropoff point - where Rozum drops 
+
+% Drink points:
+    % Drink cup pickup point - where Rozum 
+
+
+    % Drink cup fill point - where cup is placed to be filled
+
+%% Generate Environment
+
+% Set up robots.
 r = RozumPulse75();
+r.model.base = r.model.base*transl(0,-1.2,0);
 
 d = Dobot(false);
-d.model.base = d.model.base*trotx(pi/2)*transl(0.5,0.04,0.5); % (x,z,y)
+d.model.base = r.model.base*trotx(pi/2)*transl(0,0.04,-0.8); % (x,z,y)
 d.model.animate(zeros(1,6));
-r.model.teach();
+
+
+% Soft drinks dispenser.
+    
+    % Cola (legally distinct)
+    softDrinkColaCoords = r.model.base*transl(-0.4,-80/1000,0.3);
+    softDrinkCola_h = PlaceObject('Items\SoftDrink_Cola.ply', softDrinkColaCoords(1:3,4)'); 
+    
+    softDrinkDispenserColaCoords = softDrinkColaCoords*transl(0,0,-60/1000);
+    softDrinkDispenserCola_h = PlaceObject('Items\SoftDrinkDispenser.ply', softDrinkDispenserColaCoords(1:3,4)'); 
+
+    % Orange 
+    softDrinkOrangeCoords = softDrinkColaCoords*transl(0,80/1000,0);
+    softDrinkOrange_h = PlaceObject('Items\SoftDrink_Orange.ply', softDrinkOrangeCoords(1:3,4)'); 
+    
+    softDrinkDispenserOrangeCoords = softDrinkOrangeCoords*transl(0,0,-60/1000);
+    softDrinkDispenserOrange_h = PlaceObject('Items\SoftDrinkDispenser.ply', softDrinkDispenserOrangeCoords(1:3,4)'); 
+
+    % Lemon 
+    softDrinkLemonCoords = softDrinkOrangeCoords*transl(0,80/1000,0);
+    softDrinkCola_h = PlaceObject('Items\SoftDrink_Lemon.ply', softDrinkLemonCoords(1:3,4)'); 
+    
+    softDrinkDispenserLemonCoords = softDrinkLemonCoords*transl(0,0,-60/1000);
+    softDrinkDispenserLemon_h = PlaceObject('Items\SoftDrinkDispenser.ply', softDrinkDispenserLemonCoords(1:3,4)'); 
+%% Perform Task
+
 axis equal;
 
 q1 = zeros(1,6);
@@ -42,7 +91,7 @@ UniversalTravel(r, q1, q2, [20, 80], d, q1, [-1, ones(1,5)], [1, 50]);
 function UniversalTravel(r1_h ,r1q1, r1q2, r1Steps, r2_h, r2q1, r2q2, r2Steps)
 
 % Format args as:
-% [robot handle, q1, q2, starting step, steps]... , global step number
+% robot handle, q1, q2, [starting step, steps]... 
 
     % TO DO LIST: 
     % - Add choice between trapezoidal, quintic polynomial, RMRC.
@@ -74,14 +123,16 @@ function UniversalTravel(r1_h ,r1q1, r1q2, r1Steps, r2_h, r2q1, r2q2, r2Steps)
       qr2Matrix(i,:) = (1-s(i))*r2q1 + s(i)*r2q2;
     end
 
+    % Decide the maximum step number for this specific function call.
+
     if (r1Steps(1) + r1Steps(2)) > (r2Steps(1) + r2Steps(2)) % r1 has the last step.
         maxSteps = r1Steps(1) + r1Steps(2);
     else % r2 has the last step.
         maxSteps = r2Steps(1) + r2Steps(2);
     end
 
-    size(qr1Matrix)
-    size(qr2Matrix)
+    %size(qr1Matrix)
+    %size(qr2Matrix)
 
     % Animate the movement.
     r1Index = 1;
@@ -99,9 +150,6 @@ function UniversalTravel(r1_h ,r1q1, r1q2, r1Steps, r2_h, r2q1, r2q2, r2Steps)
         end
     pause(0.01);
     end
-
-
-
 end
 
 %% Dobot Travel Method Outside of Class 
@@ -127,8 +175,6 @@ function DTravel(robot, q1, q2, steps)
             end
 
             for i=1:steps
-                %delete(eefPos_h)
-                %eefPos_h = trplot(self.model.fkine(qMatrix(i,:)));
                 robot.model.animate(qMatrix(i,:));
                 pause(0.01);
             end
