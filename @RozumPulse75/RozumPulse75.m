@@ -13,15 +13,15 @@ classdef RozumPulse75 < handle
 
             
             self.GetRozumPulse75();
-            self.model.plot(zeros(1,self.model.n), 'workspace', self.workspace, 'scale', 0.3);
+            %self.model.plot(zeros(1,self.model.n), 'workspace', self.workspace, 'scale', 0.3);
 
 
             self.PlotRozum();
-            %self.PlotAndColourRobot();%robot,workspace);
             %self.Gripper();
 
             drawnow;
         end
+        %%
         function GetRozumPulse75(self)
 
             name = ['RozumPulse75'];
@@ -44,6 +44,7 @@ classdef RozumPulse75 < handle
 
             self.model.base = eye(4);
         end
+        %%
         function PlotRozum(self)
             for linkIndex = 0:self.model.n
                 %display(['Link',num2str(linkIndex),'.ply']);
@@ -74,6 +75,35 @@ classdef RozumPulse75 < handle
                 end
             end
         end  
+        %%
+        function Travel(self, q1, q2, steps)
+
+            % TO DO LIST:
+            % - Add choice between trapezoidal, quintic polynomial, RMRC.
+            % - Manipulability measure for singularities and DLS
+            % - Move simultaneously with the other robot and all other
+            % objects.
+            % - Attach points for items and grippers.
+
+
+            s = lspb(0,1,steps);    % Create matrix describing trapezoidal trajectory 
+            %                           movement varying smoothly from S0 to SF (time)
+            %                           in M steps. V can be specified, but is computed
+            %                           automatically. 
+            qMatrix = nan(steps,self.model.n);
+            for i=1:steps
+                qMatrix(i,:) = (1-s(i))*q1 + s(i)*q2;
+            end
+
+            for i=1:steps
+                %delete(eefPos_h)
+                %eefPos_h = trplot(self.model.fkine(qMatrix(i,:)));
+                self.model.animate(qMatrix(i,:));
+               pause(0.01);
+            end
+
+
+        end
     end
 
 end
