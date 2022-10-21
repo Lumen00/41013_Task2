@@ -1,0 +1,4 @@
+1. GUI finished 85%, waiting you finsh movement part
+2.Test GUI on your computer and tune it based on real robot
+3.Pls upload whole working document on .zip, so i can performance same task as you
+4.I will try to finsh collisuion dection, sensor.
