@@ -2,6 +2,11 @@ clear all;
 close all;
 hold on;
 
+%% Set up controller for input
+id = 1;
+global joy;
+joy = vrjoystick(id);
+
 %% Dobot testing for real use:
  
 % d = Dobot(false);
@@ -90,10 +95,12 @@ gripper = SerialLink([L1], 'name', 'master');
 %% Generate Environment
 
 % Set up robots.
+global r;
 r = RozumPulse75();
 r.model.base = r.model.base*transl(0,-0.8,0.85);
 r.model.animate(ones(1,6));
 
+global d;
 d = Dobot(false);
 d.model.base = r.model.base*trotx(pi/2)*transl(0,0.04,-1.0); % (x,z,y)
 d.model.animate(zeros(1,6));
@@ -175,6 +182,10 @@ zHighBound = r.model.base(3,4)+1;
 zLowBound = r.model.base(3,4);
 SafetyGlass2_h = surf([xConstant,xConstant;xConstant,xConstant],[yLowBound,yLowBound;yHighBound,yHighBound],[zLowBound,zHighBound;zLowBound,zHighBound],'CData',imread('Items\SafetyGlass.png'),'FaceColor','texturemap', 'FaceAlpha', 0.2);
 
+% Plot lego man as an employee. Robots will stop if moved into hazard area.
+person_Coords = r.model.base*transl(1.7,0,-0.85);
+global person_h;
+person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
 
 % Sensor in the meal box placement area to protect personnel and shut off
 % the Rozum's movement (if it's doing anything).
@@ -264,22 +275,22 @@ r.Travel(lastPose, zeros(1,6), 50);
 %% Navigation for handover of meal box.
 
 
-pickup = deg2rad([0, 90, 30, 10, -30, 85]);
-dropoff1 = [-1, 0, 0.5236, 0.1745, 0.8657, 1.4835];
-dropoff2 = [-1, 0, 0.5236, 0.8727, 0.1745, 1.4835];
-
-% ROZUM Assembles the following into bag held by dobot.
-% Cutlery
-% Meal Box
-% Drink
-
-DTravel(d, pickup, dropoff1, 50, 1);
-DTravel(d, dropoff1, dropoff2, 50, 1);
-DTravel(d, dropoff2, dropoff1, 50, 1);
-DTravel(d, dropoff1, pickup, 50, 1);
+% pickup = deg2rad([0, 90, 30, 10, -30, 85]);
+% dropoff1 = [-1, 0, 0.5236, 0.1745, 0.8657, 1.4835];
+% dropoff2 = [-1, 0, 0.5236, 0.8727, 0.1745, 1.4835];
+% 
+% % ROZUM Assembles the following into bag held by dobot.
+% % Cutlery
+% % Meal Box
+% % Drink
+% 
+% DTravel(d, pickup, dropoff1, 50, 1, r);
+% DTravel(d, dropoff1, dropoff2, 50, 1, r);
+% DTravel(d, dropoff2, dropoff1, 50, 1, r);
+% DTravel(d, dropoff1, pickup, 50, 1, r);
 
 %% VisualServoing test
-VisualServoingSafety(r, d);
+% VisualServoingSafety(r, d);
 
 
 %%
@@ -287,7 +298,8 @@ VisualServoingSafety(r, d);
 
 
 %% VisualServoingSafety
-% Start the visual servoing safety demonstration.
+% Start the visual servoing safety demonstration. Note that the camera will
+% clear the figure once the function exits.
 function VisualServoingSafety(r, d)
     % the Rozum will hold the safety sign that the Dobot has to retreat
     % from. The Dobot will have a camera mounted to its end effector. It is
@@ -297,7 +309,7 @@ function VisualServoingSafety(r, d)
     % a pose where the dobot can see it.'
 
     rozumTargetPose = deg2rad([104, 0, -101, 10.8, 90, 0]);
-    dobotStartPose = deg2rad([0, 90, 30, 10, -30, 85]);
+    dobotStartPose = [0, deg2rad([90, 40, 10, -51.6, 0])];
 
     r.Travel(r.model.getpos, zeros(1,6), 40); % Move Rozum to safe pose first.
 
@@ -323,17 +335,143 @@ function VisualServoingSafety(r, d)
 
     spherePoints_h = plot_sphere(P, 0.01, 'g');
 
-%
-    % Mount the camera onto the Dobot
-cam = CentralCamera('focal', 0.08, 'pixel', 10e-5, ...
-'resolution', [1024 1024], 'centre', [512 512],'name', 'DobotCamera');
+    % Mount the camera onto the Dobot  
 
-cam.plot_camera('Tcam',Tc0, 'label','scale',0.15);
+    cam = CentralCamera('focal', 0.08, 'pixel', 10e-5, ...
+    'resolution', [1024 1024], 'centre', [512 512],'name', 'DobotCamera');
+    
+    % The desirable transform is the centre of the sign with variable Y. 
 
+    signCentre = [Tr(1,4), Tr(2,4), (zHighBound+zLowBound)/2];
+    cameraMount = d.model.fkine(dobotStartPose);
+    depth = cameraMount(2,4)-signCentre(2); % Depth of the IBVS. Distance from camera to points along axis.
+
+    dobotEndPose = [-0.7, deg2rad([90, 40, 10, -51.6, 0])];
+
+    Tc0 = transl(signCentre)*trotx(pi/2)*trotz(pi/2)*transl(-0.07,0,-1.3); % DO NOT MOVE IN Y, DOBOT CANNOT HANDLE IT
+    trplot(Tc0);
+
+    cam.plot_camera('Tcam', cameraMount, 'scale', 0.15);
+
+
+    % Create the 2D Image view
+    cam.clf();
+        % What we want the camera to see. P as seen from desired Transform.
+        desiredCam = cam.plot(P, 'Tcam', Tc0, 'o');
+        cam.hold(true);
+        
+        % What the camera actually sees. P as seen from current Transform.
+        cam.T = cameraMount;
+        actualCam = cam.plot(P, '*');
+        pause(2);
+        cam.hold(true); 
 
     % Begin visual servoing and RMRC retreat for specified steps.
+    
+        % Continuously update the target points by updating the Tc0
+        % transform by how far back the Dobot has moved.
+        
+        % Set VS parameters:
+        fps = 25;     % Camera Frame Rate.
+        lambda = 0.3; % Controller gain.
 
+    qd = dobotStartPose; % Pose of dobot to modify.
 
+    % VS Loop will run the following steps:
+    % 1. VS to align in starting pose.
+    % 2. RMRC to move to retreat coordinates.
+    % 3. VS to realign in end pose to account for any error introduced in
+    % RMRC.
+    keyboard;
+    while true
+        % Visual servoing section
+
+            % Calculate the simulated depth of the IBVS.
+            depth = cameraMount(2,4)-signCentre(2); % Depth of the IBVS. Distance from camera to points along axis.
+
+            % Insert current view of camera in cam.T.
+            uv = cam.plot(P)
+            
+            % Calculate the image plane error (as column)
+            e = desiredCam - uv;
+            e = e(:)
+
+            % If error is sufficiently small, VS is successful. 
+            errorCheck = 0;
+            for i=1:6 % index through e and count entries with abs(e)<1.
+                if abs(e(i)) < 1
+                    errorCheck = errorCheck + 1;
+                end
+            end
+            if errorCheck == 6
+               break;
+            end            
+
+            % Calculate the image Jacobian 
+            J = cam.visjac_p(uv, depth);
+
+            % Calculate the velocity of the camera in camera frame for the next move using
+            % the error and image Jacobian.
+            v = lambda*pinv(J)*e;
+
+            % Compute the Jacobian and inverse Jacobian of the Dobot in its
+            % end effector frame.
+            Jd = d.model.jacobn(qd);
+            invJd = pinv(Jd);
+
+            % Get the joint velocities of the dobot.
+            qdDot = invJd*v;
+
+            % Limit maximum angular velocity for robot.
+             ind=find(qdDot(2:end)>2*pi);
+             if ~isempty(ind)
+                 qdDot(ind)=2*pi;
+             end
+             ind=find(qdDot(2:end)<-2*pi);
+             if ~isempty(ind)
+                 qdDot(ind)=-2*pi;
+             end
+
+             % Limit linear rail velocity.
+             if qdDot(1) > 5
+                 qdDot(1) = 5;
+             end
+             if qdDot(1) < -5
+                 qdDot(1) = -5;
+             end
+
+             % Check that all moves are within joint limits. Set
+             % velocity to zero if this is the case.
+%              for j = 2:6                                                % Loop through joints 1 to 6
+%                  if qd(j) + (1/fps)*qdDot(j) < d.model.qlim(j,1)              % If next joint angle is lower than joint limit...
+%                     qdDot(j) = 0; % Stop the motor
+%                  elseif qd(j) + (1/fps)*qdDot(j) > d.model.qlim(j,2)                 % If next joint angle is greater than joint limit ...
+%                     qdDot(j) = 0; % Stop the motor
+%                  end
+%              end
+
+             % Animate the dobot's joints.
+             qd = qd + (1/fps)*qdDot';
+
+             d.model.animate(qd);
+
+             % Get the new camera location as a result of the dobot's
+             % movement.
+
+             cameraMount = d.model.fkine(qd);
+             cam.T = cameraMount;
+             drawnow;
+
+             % Add pause to simulate the impact of the fps.
+             pause(1/fps);
+           
+    end
+    disp("SUCCESS");
+
+    d.model.teach;
+
+    keyboard;
+    cam.clf();
 end
 
 %% UniversalTravel
@@ -430,6 +568,10 @@ end
 %% RMRC
 % Given a handle for a robot, coordinates
 function lastPose = RMRC(robot, T1, T2, q0, steps, deltaT)
+    global joy;
+    global person_h;
+    global r;
+    global d;
 
     % Function requires:
     % - Handle of the robot being used.
@@ -512,6 +654,64 @@ function lastPose = RMRC(robot, T1, T2, q0, steps, deltaT)
                 qdot(i,j) = 0; % Stop the motor
             end
         end
+
+            % For each step, check controller input for two modes to stop
+            % movement:
+            % 1. E-Stop
+            % 2. Sensing of personnel in hazard zone. 
+            
+                % Read controller input (Using XBONE configuration)
+                [axes, buttons, povs] = read(joy);
+                
+                % Press A (button 1) to stop movement and enter infinite
+                % loop. Press A (button 1) to prime restart. Press B 
+                % (button 2) to restart movement.
+                if buttons(1) == 1 % STOP
+                    disp('STOP: USER INPUT');
+                    pause(2); % Let button unpress.
+                    eStopStatus = 0; % 0 - stopped, 1 - primed
+                    while true
+                        [axes, buttons, povs] = read(joy);
+                        if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
+                            disp('RESTART PRIMED');
+                            eStopStatus = 1;
+                            pause(2); % Let button unpress.
+                        elseif (buttons(1) == 1) && (eStopStatus == 1)
+                            disp('RESTART ABORTED');
+                            eStopStatus = 0;
+                            pause(2);
+                        elseif (buttons(2) == 1) && (eStopStatus == 1)
+                            disp('RESTARTING');
+                            break;
+                        end
+                    end
+                elseif buttons(4) == 1% Press Y to move lego man into hazard zone and stop robots.
+                    person_Coords = r.model.base*transl(0.7,0,-0.85);
+                    delete(person_h);
+                    person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
+                    disp('STOP: SENSOR INPUT');
+                    pause(2); % Let button unpress.
+                    eStopStatus = 0; % 0 - stopped, 1 - primed
+                    while true
+                        [axes, buttons, povs] = read(joy);
+                        if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
+                            disp('RESTART PRIMED');
+                            eStopStatus = 1;
+                            pause(2); % Let button unpress.
+                        elseif (buttons(1) == 1) && (eStopStatus == 1)
+                            disp('RESTART ABORTED');
+                            eStopStatus = 0;
+                            pause(2);
+                        elseif (buttons(2) == 1) && (eStopStatus == 1)
+                            disp('RESTARTING');
+                            person_Coords = r.model.base*transl(1.7,0,-0.85);
+                            delete(person_h);
+                            person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
+                            break;
+                        end
+                    end
+                end
+
         robot.model.animate(qRMatrix(i,:));
         pause(0.001);
     end 
@@ -520,7 +720,12 @@ end
 
 %% Dobot Travel Method Outside of Class 
 % Only for independent movement of the robot.
-function DTravel(robot, q1, q2, steps, mode)
+function DTravel(robot, q1, q2, steps, mode, r)
+    global joy;
+    global person_h;
+    global r;
+    global d;
+
 
     % mode:
     %   1 - Trapezoidal
@@ -546,7 +751,66 @@ function DTravel(robot, q1, q2, steps, mode)
         qMatrix = jtraj(q1, q2, steps);
     end
        for i=1:steps
+            % For each step, check controller input for two modes to stop
+            % movement:
+            % 1. E-Stop
+            % 2. Sensing of personnel in hazard zone. 
+            
+                % Read controller input (Using XBONE configuration)
+                [axes, buttons, povs] = read(joy);
+                
+                % Press A (button 1) to stop movement and enter infinite
+                % loop. Press A (button 1) to prime restart. Press B 
+                % (button 2) to restart movement.
+                if buttons(1) == 1 % STOP
+                    disp('STOP: USER INPUT');
+                    pause(2); % Let button unpress.
+                    eStopStatus = 0; % 0 - stopped, 1 - primed
+                    while true
+                        [axes, buttons, povs] = read(joy);
+                        if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
+                            disp('RESTART PRIMED');
+                            eStopStatus = 1;
+                            pause(2); % Let button unpress.
+                        elseif (buttons(1) == 1) && (eStopStatus == 1)
+                            disp('RESTART ABORTED');
+                            eStopStatus = 0;
+                            pause(2);
+                        elseif (buttons(2) == 1) && (eStopStatus == 1)
+                            disp('RESTARTING');
+                            break;
+                        end
+                    end
+                elseif buttons(4) == 1% Press Y to move lego man into hazard zone and stop robots.
+                    person_Coords = r.model.base*transl(0.7,0,-0.85);
+                    delete(person_h);
+                    person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
+                    disp('STOP: SENSOR INPUT');
+                    pause(2); % Let button unpress.
+                    eStopStatus = 0; % 0 - stopped, 1 - primed
+                    while true
+                        [axes, buttons, povs] = read(joy);
+                        if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
+                            disp('RESTART PRIMED');
+                            eStopStatus = 1;
+                            pause(2); % Let button unpress.
+                        elseif (buttons(1) == 1) && (eStopStatus == 1)
+                            disp('RESTART ABORTED');
+                            eStopStatus = 0;
+                            pause(2);
+                        elseif (buttons(2) == 1) && (eStopStatus == 1)
+                            disp('RESTARTING');
+                            person_Coords = r.model.base*transl(1.7,0,-0.85);
+                            delete(person_h);
+                            person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
+                            break;
+                        end
+                    end
+                end
+
+            % If permitted to proceed, resume animating the robot.
+
            robot.model.animate(qMatrix(i,:));
-           pause(0.01);
+           drawnow;
        end
 end

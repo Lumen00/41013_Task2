@@ -4,7 +4,7 @@ classdef RozumPulse75 < handle
         model;
 
         %> default workspace
-        workspace = [-5 5 -5 5 0 5]./5;   
+        workspace = [-5 5 -5 5 0 5]./2;   
 
     end
 
@@ -76,7 +76,12 @@ classdef RozumPulse75 < handle
             end
         end  
         %%
-        function Travel(self, q1, q2, steps)
+        function Travel(self, q1, q2, steps, joy)
+
+        global joy;
+        global person_h;
+        global r;
+        global d;
 
             % TO DO LIST:
             % - Add choice between trapezoidal, quintic polynomial, RMRC.
@@ -98,10 +103,69 @@ classdef RozumPulse75 < handle
             for i=1:steps
                 %delete(eefPos_h)
                 %eefPos_h = trplot(self.model.fkine(qMatrix(i,:)));
+
+                % For each step, check controller input for two modes to stop
+                % movement:
+                % 1. E-Stop
+                % 2. Sensing of personnel in hazard zone. 
+                
+                    % Read controller input (Using XBONE configuration)
+                    [axes, buttons, povs] = read(joy);
+                    
+                    % Press A (button 1) to stop movement and enter infinite
+                    % loop. Press A (button 1) to prime restart. Press B 
+                    % (button 2) to restart movement.
+                    if buttons(1) == 1 % STOP
+                        disp('STOP: USER INPUT');
+                        pause(2); % Let button unpress.
+                        eStopStatus = 0; % 0 - stopped, 1 - primed
+                        while true
+                            [axes, buttons, povs] = read(joy);
+                            if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
+                                disp('RESTART PRIMED');
+                                eStopStatus = 1;
+                                pause(2); % Let button unpress.
+                            elseif (buttons(1) == 1) && (eStopStatus == 1)
+                                disp('RESTART ABORTED');
+                                eStopStatus = 0;
+                                pause(2);
+                            elseif (buttons(2) == 1) && (eStopStatus == 1)
+                                disp('RESTARTING');
+                                break;
+                            end
+                        end
+                    elseif buttons(4) == 1% Press Y to move lego man into hazard zone and stop robots.
+                        person_Coords = r.model.base*transl(0.7,0,-0.85);
+                        delete(person_h);
+                        person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
+                        disp('STOP: SENSOR INPUT');
+                        pause(2); % Let button unpress.
+                        eStopStatus = 0; % 0 - stopped, 1 - primed
+                        while true
+                            [axes, buttons, povs] = read(joy);
+                            if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
+                                disp('RESTART PRIMED');
+                                eStopStatus = 1;
+                                pause(2); % Let button unpress.
+                            elseif (buttons(1) == 1) && (eStopStatus == 1)
+                                disp('RESTART ABORTED');
+                                eStopStatus = 0;
+                                pause(2);
+                            elseif (buttons(2) == 1) && (eStopStatus == 1)
+                                disp('RESTARTING');
+                                person_Coords = r.model.base*transl(1.7,0,-0.85);
+                                delete(person_h);
+                                person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
+                                break;
+                            end
+                        end
+                    end
+
+
+
                 self.model.animate(qMatrix(i,:));
                pause(0.01);
             end
-
 
         end
     end
