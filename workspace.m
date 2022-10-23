@@ -2,10 +2,23 @@ clear all;
 close all;
 hold on;
 
-%% Set up controller for input
+%% Set up controller for input (disable if you don't have the joystick)
+global enableJoy
+enableJoy = 0;
 id = 1;
 global joy;
-joy = vrjoystick(id);
+if enableJoy
+    joy = vrjoystick(id);
+else
+    buttons = zeros(1,16);
+end
+
+%% Set up item pickup status globally.
+global itemPickup; % 0 - none, 1 - cola, 2 - cutlery, 3 - sauce
+itemPickup = 0;
+
+global mealPickup;
+mealPickup = 0;
 
 %% Dobot testing for real use:
  
@@ -33,64 +46,30 @@ joy = vrjoystick(id);
 %DTravel(d, q1, q2, 1);
 
 %% GENERAL TO DO LIST:
-% - Make environment
-% - Make items
-% - Make grippers
 % - Visual servoing
-% - System stop
 % - Collision detection
 % - GUI Movement/Controller Movement
-% - Colour Rozum Pulse 75
 % - Plan meal packaging
-    % + Bagging vs... 
-    % + Tray Placement?
-    % + Cutlery
-    % + Drinks
     % + Passing between robots
-    % + Handover to customer/driver
 % - Create pickup status for each robot and each item to indicate what each
 % robot is holding. Travel functions will check for each robots' status and
 % move whatever is set to true.
-% - Safety
 
 
-%% Plot Critical Points
-
-% Handover point - where bag is passed between robots.
-
-
-% Dropoff point - where Dobot releases bag for collection.
-
-
-% Cutlery points:
-    % Cutlery pickup point - where Rozum collects cutlery package.
-
-    % Cutlery dropoff point - where Rozum drops 
-
-% Drink points:
-    % Drink cup pickup point - where Rozum 
-
-
-    % Drink cup fill point - where cup is placed to be filled
-
-%% Test gripper plotting
-L1 = Link('d',0,'a',0,'alpha',0,'qlim',deg2rad([-180 180]), 'offset',0); 
-gripper = SerialLink([L1], 'name', 'master');
+%% Gripper plotting
+% L1 = Link('d',0,'a',0,'alpha',0,'qlim',deg2rad([-180 180]), 'offset',0); 
+% gripper = SerialLink([L1], 'name', 'master');
 
 % Plot the base and the master finger of the gripper.
 
-            for linkIndex = 0:0
-                %display(['Link',num2str(linkIndex),'.ply']);
-                [ faceData, vertexData, plyData{linkIndex + 1} ] = plyread(['Gripper',num2str(linkIndex),'.ply'],'tri'); %#ok<AGROW>                
-                gripper.faces{linkIndex + 1} = faceData;
-                gripper.points{linkIndex + 1} = vertexData;
-            end
+%             for linkIndex = 0:0
+%                 %display(['Link',num2str(linkIndex),'.ply']);
+%                 [ faceData, vertexData, plyData{linkIndex + 1} ] = plyread(['Gripper',num2str(linkIndex),'.ply'],'tri'); %#ok<AGROW>                
+%                 gripper.faces{linkIndex + 1} = faceData;
+%                 gripper.points{linkIndex + 1} = vertexData;
+%             end
 
-% Plot the slave finger of the gripper.
-
-% Animate both master and slave gripper into the starting configuration.
-
-%gripper.plot(zeros(1,1));
+gripperOffset = 0.15;
 
 %% Generate Environment
 
@@ -101,32 +80,34 @@ r.model.base = r.model.base*transl(0,-0.8,0.85);
 r.model.animate(ones(1,6));
 
 global d;
-d = Dobot(false);
-d.model.base = r.model.base*trotx(pi/2)*transl(0,0.04,-1.0); % (x,z,y)
-d.model.animate(zeros(1,6));
+d = DobotMagician();
+d.model.base = r.model.base*transl(0,0.9,0); % Globally: (x,z,y)
+d.model.animate(zeros(1,5));
 
-% Soft drinks dispenser. When picking one up, make a new instance of
-% object.
+% Soft drinks and other items dispenser. 
     % Cola (legally distinct)
     softDrinkColaCoords = r.model.base*transl(-0.4,-80/1000,0.3);
+    global softDrinkCola_h;
     softDrinkCola_h = PlaceObject('Items\SoftDrink_Cola.ply', softDrinkColaCoords(1:3,4)'); 
     
     softDrinkDispenserColaCoords = softDrinkColaCoords*transl(0,0,-60/1000);
     softDrinkDispenserCola_h = PlaceObject('Items\SoftDrinkDispenser.ply', softDrinkDispenserColaCoords(1:3,4)'); 
 
-    % Orange 
-    softDrinkOrangeCoords = softDrinkColaCoords*transl(0,100/1000,0);
-    softDrinkOrange_h = PlaceObject('Items\SoftDrink_Orange.ply', softDrinkOrangeCoords(1:3,4)'); 
+    % Cutlery Container 
+    cutleryCoords = softDrinkColaCoords*transl(0,100/1000,0);
+    global cutlery_h;
+    cutlery_h = PlaceObject('Items\CutleryContainer.ply', cutleryCoords(1:3,4)'); 
     
-    softDrinkDispenserOrangeCoords = softDrinkOrangeCoords*transl(0,0,-60/1000);
-    softDrinkDispenserOrange_h = PlaceObject('Items\SoftDrinkDispenser.ply', softDrinkDispenserOrangeCoords(1:3,4)'); 
+    cutleryDispenserCoords = cutleryCoords*transl(0,0,-60/1000);
+    cutleryDispenser_h = PlaceObject('Items\SoftDrinkDispenser.ply', cutleryDispenserCoords(1:3,4)'); 
 
-    % Lemon 
-    softDrinkLemonCoords = softDrinkOrangeCoords*transl(0,100/1000,0);
-    softDrinkCola_h = PlaceObject('Items\SoftDrink_Lemon.ply', softDrinkLemonCoords(1:3,4)'); 
+    % Sauce Container)
+    sauceCoords = cutleryCoords*transl(0,100/1000,0);
+    global sauce_h;    
+    sauce_h = PlaceObject('Items\SauceContainer.ply', sauceCoords(1:3,4)'); 
     
-    softDrinkDispenserLemonCoords = softDrinkLemonCoords*transl(0,0,-60/1000);
-    softDrinkDispenserLemon_h = PlaceObject('Items\SoftDrinkDispenser.ply', softDrinkDispenserLemonCoords(1:3,4)'); 
+    sauceDispenserCoords = sauceCoords*transl(0,0,-60/1000);
+    sauceDispenser_h = PlaceObject('Items\SoftDrinkDispenser.ply', sauceDispenserCoords(1:3,4)'); 
 
 % Plot bench space.
     
@@ -153,32 +134,52 @@ d.model.animate(zeros(1,6));
     mealBox_OpenCoords = r.model.base*transl(0,-0.55,0);
     mealBox_Open_h = PlaceObject('Items\MealBox_Open.ply', mealBox_OpenCoords(1:3,4)'); 
 
-% Plot cutlery boxes.
-
-
-
-% Plot box folding space (Rozum bot is to push box in and pull it back
-% out with the handles).
-
-
 
 % Plot walls for holding equipment.
 
+yConstant = r.model.base(2,4)-1;
+xHighBound = r.model.base(1,4)+1.5;
+xLowBound = r.model.base(1,4)-0.9;
+zHighBound = 2;
+zLowBound = 0;
+wall1_h = surf([xLowBound,xLowBound;xHighBound,xHighBound],[yConstant,yConstant;yConstant,yConstant],[zLowBound,zHighBound;zLowBound,zHighBound],'CData',imread('Items\wall.jpg'),'FaceColor','texturemap');
 
+xConstant = r.model.base(1,4)-0.9;
+yHighBound = r.model.base(2,4)+2.4;
+yLowBound = r.model.base(2,4)-1;
+zHighBound = 2;
+zLowBound = 0;
+wall2_h = surf([xConstant,xConstant;xConstant,xConstant],[yLowBound,yLowBound;yHighBound,yHighBound],[zLowBound,zHighBound;zLowBound,zHighBound],'CData',imread('Items\wall.jpg'),'FaceColor','texturemap');
+
+% Customer-Employee Dividing Wall
+
+yConstant = r.model.base(2,4)+1;
+xHighBound = r.model.base(1,4)+1.5;
+xLowBound = r.model.base(1,4)+0.4;
+zHighBound = 0.7;
+zLowBound = 0;
+wall3_h = surf([xLowBound,xLowBound;xHighBound,xHighBound],[yConstant,yConstant;yConstant,yConstant],[zLowBound,zHighBound;zLowBound,zHighBound],'CData',imread('Items\wall.jpg'),'FaceColor','texturemap');
+
+yConstant = r.model.base(2,4)+1;
+xHighBound = r.model.base(1,4)+1.5;
+xLowBound = r.model.base(1,4)+0.4;
+zHighBound = 2;
+zLowBound = 0.7;
+LookingGlass_h = surf([xLowBound,xLowBound;xHighBound,xHighBound],[yConstant,yConstant;yConstant,yConstant],[zLowBound,zHighBound;zLowBound,zHighBound],'CData',imread('Items\SafetyGlass.png'),'FaceColor','texturemap', 'FaceAlpha', 0.2);
 
 % Plot safety glass walls. Use these for link collision checks later.
 
 yConstant = r.model.base(2,4)+2.4;
 xHighBound = r.model.base(1,4)+0.4;
-xLowBound = r.model.base(1,4)-0.4;
-zHighBound = r.model.base(3,4)+1;
+xLowBound = r.model.base(1,4)-0.9;
+zHighBound = 2;
 zLowBound = r.model.base(3,4);
 SafetyGlass1_h = surf([xLowBound,xLowBound;xHighBound,xHighBound],[yConstant,yConstant;yConstant,yConstant],[zLowBound,zHighBound;zLowBound,zHighBound],'CData',imread('Items\SafetyGlass.png'),'FaceColor','texturemap', 'FaceAlpha', 0.2);
 
 xConstant = r.model.base(1,4)+0.4;
 yHighBound = r.model.base(2,4)+2.4;
-yLowBound = r.model.base(2,4)+0.7;
-zHighBound = r.model.base(3,4)+1;
+yLowBound = r.model.base(2,4)+1.8;
+zHighBound = 2;
 zLowBound = r.model.base(3,4);
 SafetyGlass2_h = surf([xConstant,xConstant;xConstant,xConstant],[yLowBound,yLowBound;yHighBound,yHighBound],[zLowBound,zHighBound;zLowBound,zHighBound],'CData',imread('Items\SafetyGlass.png'),'FaceColor','texturemap', 'FaceAlpha', 0.2);
 
@@ -190,14 +191,80 @@ person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
 % Sensor in the meal box placement area to protect personnel and shut off
 % the Rozum's movement (if it's doing anything).
 
+    % PID
+    PID_h = PlaceObject('Items\Sensor.ply'); 
 
-% Set up hazard area for robot
-floor = r.model.base(3,4)-0.84;
-xHighBound = r.model.base(1,4)+1.5;
-xLowBound = r.model.base(1,4)-1.5;
-yHighBound = r.model.base(2,4)+2.4;
-yLowBound = r.model.base(2,4)-1;
-hazardFloor_h = surf([xLowBound,xLowBound;xHighBound,xHighBound],[yLowBound,yHighBound;yLowBound,yHighBound],[floor,floor;floor,floor],'CData',imread('Items\hazardFloor.jpg'),'FaceColor','texturemap');
+    PIDVerts = get(PID_h,'Vertices');
+    PIDAdjust = r.model.base*troty(pi/2)*transl(0.3,0,0.4);
+    PIDTransformedVerts = [PIDVerts, ones(size(PIDVerts,1),1)]*PIDAdjust';
+    set(PID_h, 'Vertices', PIDTransformedVerts(:,1:3));
+
+    % Emergency STOP (In hazard zone)
+    EStop_h = PlaceObject('Items\Emergency_Stop.ply'); 
+
+    EStopVerts = get(EStop_h,'Vertices');
+    EStopAdjust = r.model.base*transl(0.3,-0.4,0);
+    EStopTransformedVerts = [EStopVerts, ones(size(EStopVerts,1),1)]*EStopAdjust';
+    set(EStop_h, 'Vertices', EStopTransformedVerts(:,1:3));
+
+
+    % Emergency STOP (Outside of hazard zone)
+    EStop_Outside_h = PlaceObject('Items\Emergency_Stop.ply'); 
+
+    EStop_OutsideVerts = get(EStop_Outside_h,'Vertices');
+    EStop_OutsideAdjust = r.model.base*trotx(pi/2)*transl(1.3,0,1.08);
+    EStop_OutsideTransformedVerts = [EStop_OutsideVerts, ones(size(EStop_OutsideVerts,1),1)]*EStop_OutsideAdjust';
+    set(EStop_Outside_h, 'Vertices', EStop_OutsideTransformedVerts(:,1:3));
+
+
+    % Siren/Alarm
+    Alarm_h = PlaceObject('Items\Alarm.ply'); 
+
+    AlarmVerts = get(Alarm_h,'Vertices');
+    AlarmAdjust = r.model.base*trotz(-pi)*transl(0.7,-1.5,0.4);
+    AlarmTransformedVerts = [AlarmVerts, ones(size(AlarmVerts,1),1)]*AlarmAdjust';
+    set(Alarm_h, 'Vertices', AlarmTransformedVerts(:,1:3));    
+
+    
+    % Fire Extinguisher (Inside hazards zone)
+    FireExt_h = PlaceObject('Items\fireextinguisherco2.ply'); 
+
+    FireExtVerts = get(FireExt_h,'Vertices');
+    FireExtAdjust = r.model.base*transl(1.2,-0.9,-0.4);
+    FireExtTransformedVerts = [FireExtVerts, ones(size(FireExtVerts,1),1)]*FireExtAdjust';
+    set(FireExt_h, 'Vertices', FireExtTransformedVerts(:,1:3));        
+
+
+    % Fire Extinguisher (Outside hazard zone)
+    FireExt_Outside_h = PlaceObject('Items\fireextinguisherco2.ply'); 
+
+    FireExt_OutsideVerts = get(FireExt_Outside_h,'Vertices');
+    FireExt_OutsideAdjust = r.model.base*transl(0.7,-1.1,-0.4);
+    FireExt_OutsideTransformedVerts = [FireExt_OutsideVerts, ones(size(FireExt_OutsideVerts,1),1)]*FireExt_OutsideAdjust';
+    set(FireExt_Outside_h, 'Vertices', FireExt_OutsideTransformedVerts(:,1:3));   
+   
+    % Signage
+    xConstant = r.model.base(1,4)-0.8;
+    yHighBound = r.model.base(2,4)-0.15-0.6;
+    yLowBound = r.model.base(2,4)+0.15-0.6;
+    zHighBound = r.model.base(3,4)+0.8;
+    zLowBound = r.model.base(3,4)+0.3;
+    sign1_h = surf([xConstant,xConstant;xConstant,xConstant],[yLowBound,yLowBound;yHighBound,yHighBound],[zLowBound,zHighBound;zLowBound,zHighBound],'CData',imread('Items\cobotSign.jpg'),'FaceColor','texturemap');
+
+    xConstant = r.model.base(1,4)+0.41;
+    yHighBound = r.model.base(2,4)+2.3;
+    yLowBound = r.model.base(2,4)+2.1;
+    zHighBound = r.model.base(3,4)+0.8;
+    zLowBound = r.model.base(3,4)+0.3;
+    sign2_h = surf([xConstant,xConstant;xConstant,xConstant],[yHighBound,yHighBound;yLowBound,yLowBound],[zLowBound,zHighBound;zLowBound,zHighBound],'CData',imread('Items\cobotSign.jpg'),'FaceColor','texturemap');
+
+    % Set up hazard area for robot
+    floor = r.model.base(3,4)-0.84;
+    xHighBound = r.model.base(1,4)+1.5;
+    xLowBound = r.model.base(1,4)-1.5;
+    yHighBound = r.model.base(2,4)+2.4;
+    yLowBound = r.model.base(2,4)-1;
+    hazardFloor_h = surf([xLowBound,xLowBound;xHighBound,xHighBound],[yLowBound,yHighBound;yLowBound,yHighBound],[floor,floor;floor,floor],'CData',imread('Items\hazardFloor.jpg'),'FaceColor','texturemap');
 
 drawnow;
 %% Perform Task
@@ -207,22 +274,17 @@ axis equal;
 q1 = zeros(1,6);
 q2 = ones(1,6);
 
-view(3);
+view(142.5, 30);
 
-%% Navigation for ROZUM picking up soft drink. (In progress!)
-
-% Decide which drink to pick up (cola, orange, lemon)
-%softDrinkColaCoords
-%softDrinkOrangeCoords
-%softDrinkLemonCoords
+%% Navigation for ROZUM picking up soft drink. 
 
 % Extract the transform of the attach point of the soft drink.
 
-softDrinkTr = softDrinkColaCoords*troty(-pi/2);
+softDrinkTr = softDrinkColaCoords*troty(-pi/2)*transl(0,0,-gripperOffset);
 
 % Define the approach transform to the soft drink (away by 0.1 m in x axis)
 
-softDrinkApproachTr = softDrinkTr*transl(0,0,-0.1);
+softDrinkApproachTr = softDrinkTr*transl(0,0,-0.1-gripperOffset);
 
 % Define the initial pose to select the drink before approach.
 
@@ -234,7 +296,9 @@ qGuess = deg2rad([0, 0, 120, 60, 90,-180]);
 qApproach = r.model.ikcon(softDrinkApproachTr, qGuess);
 qPickup = r.model.ikcon(softDrinkTr, qApproach);
 
-r.Travel(zeros(1,6), qApproach , 50);
+% Complete pickup travel moves.
+
+r.Travel(q1, qApproach , 50);
 
 r.Travel(qApproach, qPickup, 30);
 
@@ -243,14 +307,14 @@ drinkLiftTr = softDrinkTr*transl(0.1,0,0);
 
 % Move to above the meal box for insertion. May require initial guess for
 % good joint lengths to avoid funky collisions.
-drinkBoxAboveTr = mealBox_OpenCoords*transl(0.07,0,0.35)*trotx(pi);
+drinkBoxAboveTr = mealBox_OpenCoords*transl(0.07,0,0.35)*trotx(pi)*trotz(pi/2);
 
 qGuess = deg2rad([80, 20, 90, -20, -90, 0]);
 
 % Animate RMRC computed
 
 % Move the soft drink out of the dispenser. Use RMRC to control velocity.
-colaPickup = true;
+itemPickup = 1;
 lastPose = RMRC(r, softDrinkTr, drinkLiftTr, qPickup, 40, 0.2);
 
 % Move the soft drink to over the meal box.
@@ -260,42 +324,174 @@ r.Travel(lastPose, qAbove, 100);
 % Move the soft drink into the meal box and deposit it. Use RMRC to control
 % velocity.
 lastPose = RMRC(r, drinkBoxAboveTr, drinkBoxAboveTr*transl(0,0,0.5), qAbove, 40, 0.2);
-colaPickup = false;
+itemPickup = 0;
 
 % Move the robot out of the box.
 lastPose = RMRC(r, drinkBoxAboveTr*transl(0,0,0.5), drinkBoxAboveTr, lastPose, 40, 0.2);
 
 % Return to neutral pose.
 
-r.Travel(lastPose, zeros(1,6), 50);
+r.Travel(lastPose, q1, 50);
 
 %% Navigation for ROZUM picking up cutlery (in progress)
 
+% Transform of cutlery container's attach point.
+
+cutleryTr = cutleryCoords*troty(-pi/2)*transl(0,0,-gripperOffset);
+
+% The approach transform to the container.
+
+cutleryApproachTr = cutleryTr*transl(0,0,-0.05-gripperOffset);
+
+% Iniitial pose guess.
+
+qGuess = deg2rad([-155, 14.4, -128, -66, -64.8, -90]);
+
+% Get the poses for the approach and pickup.
+
+qApproach = r.model.ikcon(cutleryApproachTr, qGuess);
+qPickup = r.model.ikcon(cutleryTr, qApproach);
+
+% Complete pickup travel moves.
+
+r.Travel(q1, qApproach , 50);
+
+r.Travel(qApproach, qPickup, 30);
+
+% Next stage: Lift and put in box.
+% Lift container
+itemPickup = 2;
+cutleryLiftTr = cutleryTr*transl(0.1,0,0);
+
+lastPose = RMRC(r, cutleryTr, cutleryLiftTr, qPickup, 40, 0.2);
+
+% Move to above box.
+qGuess = deg2rad([80, 20, 90, -20, -90, 0]);
+
+cutleryBoxAboveTr = mealBox_OpenCoords*transl(0,0,0.35)*trotx(pi)*trotz(pi/2);
+
+qAbove = r.model.ikcon(cutleryBoxAboveTr, qGuess);
+r.Travel(lastPose, qAbove, 100);
+
+% Insert into box and release
+lastPose = RMRC(r, cutleryBoxAboveTr, cutleryBoxAboveTr*transl(0,0,0.5), qAbove, 40, 0.2);
+itemPickup = 0;
+
+% Move out of box
+lastPose = RMRC(r, cutleryBoxAboveTr*transl(0,0,0.5), cutleryBoxAboveTr, lastPose, 40, 0.2);
+
+% Return to neutral pose.
+r.Travel(lastPose, q1, 50);
+
+%% Navigation for ROZUM picking up sauce
+% Transform of sauce container's attach point.
+
+sauceTr = sauceCoords*troty(-pi/2)*transl(0,0,-gripperOffset);
+
+% The approach transform to the container.
+
+sauceApproachTr = sauceTr*transl(0,0,-0.1);
+
+% Iniitial pose guess.
+
+qGuess = deg2rad([180, 46.8, -128, -98.4, -90, -90]);
+
+% Get the poses for the approach and pickup.
+
+qApproach = r.model.ikcon(sauceApproachTr, qGuess);
+qPickup = r.model.ikcon(sauceTr, qApproach);
+
+% Complete pickup travel moves.
+
+r.Travel(q1, qApproach , 50);
+
+r.Travel(qApproach, qPickup, 30);
+
+% Next stage: Lift and put in box.
+% Lift container
+itemPickup = 3;
+sauceLiftTr = sauceTr*transl(0.1,0,0);
+
+lastPose = RMRC(r, sauceTr, sauceLiftTr, qPickup, 40, 0.2);
+
+% Move to above box.
+qGuess = deg2rad([80, 20, 90, -20, -90, 0]);
+
+sauceBoxAboveTr = mealBox_OpenCoords*transl(-0.07,0,0.35)*trotx(pi)*trotz(pi/2);
+
+qAbove = r.model.ikcon(sauceBoxAboveTr, qGuess);
+r.Travel(lastPose, qAbove, 100);
+
+% Insert into box and release
+lastPose = RMRC(r, sauceBoxAboveTr, sauceBoxAboveTr*transl(0,0,0.5), qAbove, 40, 0.2);
+itemPickup = 0;
+
+% Move out of box
+lastPose = RMRC(r, sauceBoxAboveTr*transl(0,0,0.5), sauceBoxAboveTr, lastPose, 40, 0.2);
+
+% Return to neutral pose.
+r.Travel(lastPose, q1, 50);
+
 
 %% Navigation for handover of meal box.
+delete(mealBox_Open_h);
+delete(softDrinkCola_h);
+delete(cutlery_h);
+delete(sauce_h);
+mealBox_ClosedCoords = r.model.base*transl(0,-0.55,0);
+global mealBox_Closed_h;
+%delete(mealBox_Closed_h);
+mealBox_Closed_h = PlaceObject('Items\MealBox_Closed.ply', mealBox_ClosedCoords(1:3,4)'); 
+
+% Rozum
+
+    % Direct robot to above the rozum and pick up the meal box.
+
+    mealBoxPickupTr = mealBox_ClosedCoords*transl(0,0,0.175+0.1+gripperOffset)*trotx(pi)*trotz(pi/2);
+    mealBoxPpickupQ = r.model.ikcon(mealBoxPickupTr, lastPose);
+
+    r.Travel(zeros(1,6), mealBoxPpickupQ, 60);
+    lastPoseQ = RMRC(r, mealBoxPickupTr, mealBoxPickupTr*transl(0,0,0.1), mealBoxPpickupQ, 30, 0.2);
+    mealPickup = 1;
+    lastPoseQ = RMRC(r, mealBoxPickupTr*transl(0,0,0.1), mealBoxPickupTr, lastPoseQ, 30, 0.2);
+
+    % Swivel robot 180 degrees.
+    r.Travel(lastPoseQ, [(lastPoseQ(1) +pi) ,lastPoseQ(2:end)], 50);
+    
+    mealBoxHandoverTr = r.model.fkine([(lastPoseQ(1) +pi) ,lastPoseQ(2:end)]);
+    
+    lastPoseQ = RMRC(r, mealBoxHandoverTr, mealBoxHandoverTr*transl(0.3,0,0), [(lastPoseQ(1) +pi) ,lastPoseQ(2:end)], 30, 0.2);
+    mealPickup = 0;
+
+% Dobot
+    % Navigate to neutral pose
+    
+    % Build pickup transform. 
+    handOverCoords = ; % global (y, x, z)
+    handOverCoords = handOverCoords(1:3,4)';
+    pickup = transl(handOverCoords);
 
 
-% pickup = deg2rad([0, 90, 30, 10, -30, 85]);
-% dropoff1 = [-1, 0, 0.5236, 0.1745, 0.8657, 1.4835];
-% dropoff2 = [-1, 0, 0.5236, 0.8727, 0.1745, 1.4835];
-% 
-% % ROZUM Assembles the following into bag held by dobot.
-% % Cutlery
-% % Meal Box
-% % Drink
-% 
-% DTravel(d, pickup, dropoff1, 50, 1, r);
-% DTravel(d, dropoff1, dropoff2, 50, 1, r);
-% DTravel(d, dropoff2, dropoff1, 50, 1, r);
-% DTravel(d, dropoff1, pickup, 50, 1, r);
+pickup = deg2rad([90, 39.7, 17.2, 30, 0]);
+
+
+% Move to dropoff location. Inspect trajectory for collisions and halt if
+% there is one before moving. 
+
+dropoff1 = [-1, 0, 0.5236, 0.1745, 0.8657, 0];
+dropoff2 = [-1, 0, 0.5236, 0.8727, 0.1745, 0];
+
+%DTravel(d, );
+DTravel(d, pickup, dropoff1, 50, 1, r);
+mealPickup = 1;
+DTravel(d, dropoff1, dropoff2, 50, 1, r);
+DTravel(d, dropoff2, dropoff1, 50, 1, r);
+DTravel(d, dropoff1, pickup, 50, 1, r);
 
 %% VisualServoing test
+itemPickup = 0;
+mealPickup = 0;
 % VisualServoingSafety(r, d);
-
-
-%%
-%UniversalTravel(r, q1, q2, [20, 80], d, q1, [-1, ones(1,5)], [1, 50], 1);
-
 
 %% VisualServoingSafety
 % Start the visual servoing safety demonstration. Note that the camera will
@@ -534,6 +730,66 @@ function UniversalTravel(r1_h ,r1q1, r1q2, r1Steps, r2_h, r2q1, r2q2, r2Steps, m
     r2Index = 1;
 
     for i=1:maxSteps
+            % For each step, check controller input for two modes to stop
+            % movement:
+            % 1. E-Stop
+            % 2. Sensing of personnel in hazard zone. 
+            
+                % Read controller input (Using XBONE configuration)
+                [axes, buttons, povs] = read(joy);
+                
+                % Press A (button 1) to stop movement and enter infinite
+                % loop. Press A (button 1) to prime restart. Press B 
+                % (button 2) to restart movement.
+                if buttons(1) == 1 % STOP
+                    disp('STOP: USER INPUT');
+                    pause(2); % Let button unpress.
+                    eStopStatus = 0; % 0 - stopped, 1 - primed
+                    while true
+                        pause(0.1);
+                        [axes, buttons, povs] = read(joy);
+                        if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
+                            disp('RESTART PRIMED');
+                            eStopStatus = 1;
+                            pause(2); % Let button unpress.
+                        elseif (buttons(1) == 1) && (eStopStatus == 1)
+                            disp('RESTART ABORTED');
+                            eStopStatus = 0;
+                            pause(2);
+                        elseif (buttons(2) == 1) && (eStopStatus == 1)
+                            disp('RESTARTING');
+                            break;
+                        end
+                    end
+                elseif buttons(4) == 1% Press Y to move lego man into hazard zone and stop robots.
+                    person_Coords = r.model.base*transl(0.7,0,-0.85);
+                    delete(person_h);
+                    person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
+                    disp('STOP: SENSOR INPUT');
+                    pause(2); % Let button unpress.
+                    eStopStatus = 0; % 0 - stopped, 1 - primed
+                    while true
+                        pause(0.1);
+                        [axes, buttons, povs] = read(joy);
+                        if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
+                            disp('RESTART PRIMED');
+                            eStopStatus = 1;
+                            pause(2); % Let button unpress.
+                        elseif (buttons(1) == 1) && (eStopStatus == 1)
+                            disp('RESTART ABORTED');
+                            eStopStatus = 0;
+                            pause(2);
+                        elseif (buttons(2) == 1) && (eStopStatus == 1)
+                            disp('RESTARTING');
+                            person_Coords = r.model.base*transl(1.7,0,-0.85);
+                            delete(person_h);
+                            person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
+                            break;
+                        end
+                    end
+                end
+
+
     % Check if the starting step of each point has been reached.
         if (r1Steps(1) <= i) && (r1Index <= r1Steps(2)) % If the step is equal to or exceeds r1 starting step.
             r1_h.model.animate(qr1Matrix(r1Index,:));
@@ -572,6 +828,14 @@ function lastPose = RMRC(robot, T1, T2, q0, steps, deltaT)
     global person_h;
     global r;
     global d;
+    global itemPickup;
+    global softDrinkCola_h;
+    global cutlery_h;
+    global sauce_h;
+    global mealPickup;
+    global mealBox_Closed_h;
+    global enableJoy;
+
 
     % Function requires:
     % - Handle of the robot being used.
@@ -628,9 +892,9 @@ function lastPose = RMRC(robot, T1, T2, q0, steps, deltaT)
         Ra = T(1:3,1:3);                                                        % Current end-effector rotation matrix
     
         Rdot = (1/deltaT)*(Rd - Ra);                                                % Calculate rotation matrix error
-        S = Rdot*Ra';                                                           % Skew symmetric!
+        S = Rdot*Ra';                                                           % Skew symmetric
         
-        thetadot = [S(3,2);S(1,3);S(2,1)];                              % Check the structure of Skew Symmetric matrix!!
+        thetadot = [S(3,2);S(1,3);S(2,1)];                              % Check the structure of Skew Symmetric matrix
     
         velocity = [xdot;thetadot];
 
@@ -661,57 +925,109 @@ function lastPose = RMRC(robot, T1, T2, q0, steps, deltaT)
             % 2. Sensing of personnel in hazard zone. 
             
                 % Read controller input (Using XBONE configuration)
-                [axes, buttons, povs] = read(joy);
+                if enableJoy
+                    [axes, buttons, povs] = read(joy);
                 
-                % Press A (button 1) to stop movement and enter infinite
-                % loop. Press A (button 1) to prime restart. Press B 
-                % (button 2) to restart movement.
-                if buttons(1) == 1 % STOP
-                    disp('STOP: USER INPUT');
-                    pause(2); % Let button unpress.
-                    eStopStatus = 0; % 0 - stopped, 1 - primed
-                    while true
-                        [axes, buttons, povs] = read(joy);
-                        if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
-                            disp('RESTART PRIMED');
-                            eStopStatus = 1;
-                            pause(2); % Let button unpress.
-                        elseif (buttons(1) == 1) && (eStopStatus == 1)
-                            disp('RESTART ABORTED');
-                            eStopStatus = 0;
-                            pause(2);
-                        elseif (buttons(2) == 1) && (eStopStatus == 1)
-                            disp('RESTARTING');
-                            break;
+
+                    % Press A (button 1) to stop movement and enter infinite
+                    % loop. Press A (button 1) to prime restart. Press B 
+                    % (button 2) to restart movement.
+                    if buttons(1) == 1 % STOP
+                        disp('STOP: USER INPUT');
+                        pause(2); % Let button unpress.
+                        eStopStatus = 0; % 0 - stopped, 1 - primed
+                        while true
+                            pause(0.1);
+                            [axes, buttons, povs] = read(joy);
+                            if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
+                                disp('RESTART PRIMED');
+                                eStopStatus = 1;
+                                pause(2); % Let button unpress.
+                            elseif (buttons(1) == 1) && (eStopStatus == 1)
+                                disp('RESTART ABORTED');
+                                eStopStatus = 0;
+                                pause(2);
+                            elseif (buttons(2) == 1) && (eStopStatus == 1)
+                                disp('RESTARTING');
+                                break;
+                            end
                         end
-                    end
-                elseif buttons(4) == 1% Press Y to move lego man into hazard zone and stop robots.
-                    person_Coords = r.model.base*transl(0.7,0,-0.85);
-                    delete(person_h);
-                    person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
-                    disp('STOP: SENSOR INPUT');
-                    pause(2); % Let button unpress.
-                    eStopStatus = 0; % 0 - stopped, 1 - primed
-                    while true
-                        [axes, buttons, povs] = read(joy);
-                        if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
-                            disp('RESTART PRIMED');
-                            eStopStatus = 1;
-                            pause(2); % Let button unpress.
-                        elseif (buttons(1) == 1) && (eStopStatus == 1)
-                            disp('RESTART ABORTED');
-                            eStopStatus = 0;
-                            pause(2);
-                        elseif (buttons(2) == 1) && (eStopStatus == 1)
-                            disp('RESTARTING');
-                            person_Coords = r.model.base*transl(1.7,0,-0.85);
-                            delete(person_h);
-                            person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
-                            break;
+                    elseif buttons(4) == 1% Press Y to move lego man into hazard zone and stop robots.
+                        person_Coords = r.model.base*transl(0.7,0,-0.85);
+                        delete(person_h);
+                        person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
+                        disp('STOP: SENSOR INPUT');
+                        pause(2); % Let button unpress.
+                        eStopStatus = 0; % 0 - stopped, 1 - primed
+                        while true
+                            pause(0.1);
+                            [axes, buttons, povs] = read(joy);
+                            if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
+                                disp('RESTART PRIMED');
+                                eStopStatus = 1;
+                                pause(2); % Let button unpress.
+                            elseif (buttons(1) == 1) && (eStopStatus == 1)
+                                disp('RESTART ABORTED');
+                                eStopStatus = 0;
+                                pause(2);
+                            elseif (buttons(2) == 1) && (eStopStatus == 1)
+                                disp('RESTARTING');
+                                person_Coords = r.model.base*transl(1.7,0,-0.85);
+                                delete(person_h);
+                                person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
+                                break;
+                            end
                         end
                     end
                 end
+        if itemPickup > 0 %% If there's a drink attached to end effector, move it to end effector.
+            if itemPickup == 1 % Cola
+                % Delete instance, replot at origin, and transform to end
+                % effector.
+                delete(softDrinkCola_h);
+                softDrinkCola_h = PlaceObject('Items\SoftDrink_Cola.ply'); 
 
+                vertices = get(softDrinkCola_h, 'vertices');
+                verticesAdjustTr = robot.model.fkine(qRMatrix(i,:))*troty(pi/2)*transl(-0.15,0,0);
+                transformedVertices = [vertices,ones(size(vertices,1),1)] * verticesAdjustTr'; 
+                set(softDrinkCola_h, 'vertices', transformedVertices(:,1:3));
+                drawnow();
+            elseif itemPickup == 2 % Cutlery
+                % Delete instance, replot at origin, and transform to end
+                % effector.
+                delete(cutlery_h);
+                cutlery_h = PlaceObject('Items\CutleryContainer.ply'); 
+
+                vertices = get(cutlery_h, 'vertices');
+                verticesAdjustTr = robot.model.fkine(qRMatrix(i,:))*troty(pi/2)*transl(-0.15,0,0);
+                transformedVertices = [vertices,ones(size(vertices,1),1)] * verticesAdjustTr'; 
+                set(cutlery_h, 'vertices', transformedVertices(:,1:3));
+                drawnow();
+             elseif itemPickup == 3 % Sauce
+                % Delete instance, replot at origin, and transform to end
+                % effector.
+                delete(sauce_h);
+                sauce_h = PlaceObject('Items\SauceContainer.ply'); 
+
+                vertices = get(sauce_h, 'vertices');
+                verticesAdjustTr = robot.model.fkine(qRMatrix(i,:))*troty(pi/2)*transl(-0.15,0,0);
+                transformedVertices = [vertices,ones(size(vertices,1),1)] * verticesAdjustTr'; 
+                set(sauce_h, 'vertices', transformedVertices(:,1:3));
+                drawnow();           
+            end
+        end
+        if mealPickup == 1 % Pickup the meal with specified robot.
+            % Delete instance, replot at origin, and transform to end
+            % effector.
+            delete(mealBox_Closed_h);
+            mealBox_Closed_h = PlaceObject('Items\MealBox_Closed.ply'); 
+
+            vertices = get(mealBox_Closed_h, 'vertices');
+            verticesAdjustTr = robot.model.fkine(qRMatrix(i,:))*troty(pi)*transl(0,0,-0.15-0.2)*trotz(pi/2);
+            transformedVertices = [vertices,ones(size(vertices,1),1)] * verticesAdjustTr'; 
+            set(mealBox_Closed_h, 'vertices', transformedVertices(:,1:3));
+            drawnow();            
+        end
         robot.model.animate(qRMatrix(i,:));
         pause(0.001);
     end 
@@ -725,6 +1041,7 @@ function DTravel(robot, q1, q2, steps, mode, r)
     global person_h;
     global r;
     global d;
+    global enableJoy;
 
 
     % mode:
@@ -757,53 +1074,58 @@ function DTravel(robot, q1, q2, steps, mode, r)
             % 2. Sensing of personnel in hazard zone. 
             
                 % Read controller input (Using XBONE configuration)
-                [axes, buttons, povs] = read(joy);
+                if enableJoy
+                    [axes, buttons, povs] = read(joy);
                 
-                % Press A (button 1) to stop movement and enter infinite
-                % loop. Press A (button 1) to prime restart. Press B 
-                % (button 2) to restart movement.
-                if buttons(1) == 1 % STOP
-                    disp('STOP: USER INPUT');
-                    pause(2); % Let button unpress.
-                    eStopStatus = 0; % 0 - stopped, 1 - primed
-                    while true
-                        [axes, buttons, povs] = read(joy);
-                        if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
-                            disp('RESTART PRIMED');
-                            eStopStatus = 1;
-                            pause(2); % Let button unpress.
-                        elseif (buttons(1) == 1) && (eStopStatus == 1)
-                            disp('RESTART ABORTED');
-                            eStopStatus = 0;
-                            pause(2);
-                        elseif (buttons(2) == 1) && (eStopStatus == 1)
-                            disp('RESTARTING');
-                            break;
+                
+                    % Press A (button 1) to stop movement and enter infinite
+                    % loop. Press A (button 1) to prime restart. Press B 
+                    % (button 2) to restart movement.
+                    if buttons(1) == 1 % STOP
+                        disp('STOP: USER INPUT');
+                        pause(2); % Let button unpress.
+                        eStopStatus = 0; % 0 - stopped, 1 - primed
+                        while true
+                            pause(0.1);
+                            [axes, buttons, povs] = read(joy);
+                            if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
+                                disp('RESTART PRIMED');
+                                eStopStatus = 1;
+                                pause(2); % Let button unpress.
+                            elseif (buttons(1) == 1) && (eStopStatus == 1)
+                                disp('RESTART ABORTED');
+                                eStopStatus = 0;
+                                pause(2);
+                            elseif (buttons(2) == 1) && (eStopStatus == 1)
+                                disp('RESTARTING');
+                                break;
+                            end
                         end
-                    end
-                elseif buttons(4) == 1% Press Y to move lego man into hazard zone and stop robots.
-                    person_Coords = r.model.base*transl(0.7,0,-0.85);
-                    delete(person_h);
-                    person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
-                    disp('STOP: SENSOR INPUT');
-                    pause(2); % Let button unpress.
-                    eStopStatus = 0; % 0 - stopped, 1 - primed
-                    while true
-                        [axes, buttons, povs] = read(joy);
-                        if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
-                            disp('RESTART PRIMED');
-                            eStopStatus = 1;
-                            pause(2); % Let button unpress.
-                        elseif (buttons(1) == 1) && (eStopStatus == 1)
-                            disp('RESTART ABORTED');
-                            eStopStatus = 0;
-                            pause(2);
-                        elseif (buttons(2) == 1) && (eStopStatus == 1)
-                            disp('RESTARTING');
-                            person_Coords = r.model.base*transl(1.7,0,-0.85);
-                            delete(person_h);
-                            person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
-                            break;
+                    elseif buttons(4) == 1% Press Y to move lego man into hazard zone and stop robots.
+                        person_Coords = r.model.base*transl(0.7,0,-0.85);
+                        delete(person_h);
+                        person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
+                        disp('STOP: SENSOR INPUT');
+                        pause(2); % Let button unpress.
+                        eStopStatus = 0; % 0 - stopped, 1 - primed
+                        while true
+                            pause(0.1);
+                            [axes, buttons, povs] = read(joy);
+                            if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
+                                disp('RESTART PRIMED');
+                                eStopStatus = 1;
+                                pause(2); % Let button unpress.
+                            elseif (buttons(1) == 1) && (eStopStatus == 1)
+                                disp('RESTART ABORTED');
+                                eStopStatus = 0;
+                                pause(2);
+                            elseif (buttons(2) == 1) && (eStopStatus == 1)
+                                disp('RESTARTING');
+                                person_Coords = r.model.base*transl(1.7,0,-0.85);
+                                delete(person_h);
+                                person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
+                                break;
+                            end
                         end
                     end
                 end

@@ -76,12 +76,19 @@ classdef RozumPulse75 < handle
             end
         end  
         %%
-        function Travel(self, q1, q2, steps, joy)
+        function Travel(self, q1, q2, steps)
 
         global joy;
         global person_h;
         global r;
         global d;
+        global itemPickup;
+        global softDrinkCola_h;
+        global cutlery_h;
+        global sauce_h;
+        global mealPickup;
+        global mealBox_Closed_h;
+        global enableJoy;
 
             % TO DO LIST:
             % - Add choice between trapezoidal, quintic polynomial, RMRC.
@@ -110,59 +117,110 @@ classdef RozumPulse75 < handle
                 % 2. Sensing of personnel in hazard zone. 
                 
                     % Read controller input (Using XBONE configuration)
-                    [axes, buttons, povs] = read(joy);
+                    if enableJoy
+                        [axes, buttons, povs] = read(joy);
                     
-                    % Press A (button 1) to stop movement and enter infinite
-                    % loop. Press A (button 1) to prime restart. Press B 
-                    % (button 2) to restart movement.
-                    if buttons(1) == 1 % STOP
-                        disp('STOP: USER INPUT');
-                        pause(2); % Let button unpress.
-                        eStopStatus = 0; % 0 - stopped, 1 - primed
-                        while true
-                            [axes, buttons, povs] = read(joy);
-                            if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
-                                disp('RESTART PRIMED');
-                                eStopStatus = 1;
-                                pause(2); % Let button unpress.
-                            elseif (buttons(1) == 1) && (eStopStatus == 1)
-                                disp('RESTART ABORTED');
-                                eStopStatus = 0;
-                                pause(2);
-                            elseif (buttons(2) == 1) && (eStopStatus == 1)
-                                disp('RESTARTING');
-                                break;
+                    
+                        % Press A (button 1) to stop movement and enter infinite
+                        % loop. Press A (button 1) to prime restart. Press B 
+                        % (button 2) to restart movement.
+                        if buttons(1) == 1 % STOP
+                            disp('STOP: USER INPUT');
+                            pause(2); % Let button unpress.
+                            eStopStatus = 0; % 0 - stopped, 1 - primed
+                            while true
+                                pause(0.1);
+                                [axes, buttons, povs] = read(joy);
+                                if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
+                                    disp('RESTART PRIMED');
+                                    eStopStatus = 1;
+                                    pause(2); % Let button unpress.
+                                elseif (buttons(1) == 1) && (eStopStatus == 1)
+                                    disp('RESTART ABORTED');
+                                    eStopStatus = 0;
+                                    pause(2);
+                                elseif (buttons(2) == 1) && (eStopStatus == 1)
+                                    disp('RESTARTING');
+                                    break;
+                                end
                             end
-                        end
-                    elseif buttons(4) == 1% Press Y to move lego man into hazard zone and stop robots.
-                        person_Coords = r.model.base*transl(0.7,0,-0.85);
-                        delete(person_h);
-                        person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
-                        disp('STOP: SENSOR INPUT');
-                        pause(2); % Let button unpress.
-                        eStopStatus = 0; % 0 - stopped, 1 - primed
-                        while true
-                            [axes, buttons, povs] = read(joy);
-                            if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
-                                disp('RESTART PRIMED');
-                                eStopStatus = 1;
-                                pause(2); % Let button unpress.
-                            elseif (buttons(1) == 1) && (eStopStatus == 1)
-                                disp('RESTART ABORTED');
-                                eStopStatus = 0;
-                                pause(2);
-                            elseif (buttons(2) == 1) && (eStopStatus == 1)
-                                disp('RESTARTING');
-                                person_Coords = r.model.base*transl(1.7,0,-0.85);
-                                delete(person_h);
-                                person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
-                                break;
+                        elseif buttons(4) == 1% Press Y to move lego man into hazard zone and stop robots.
+                            person_Coords = r.model.base*transl(0.7,0,-0.85);
+                            delete(person_h);
+                            person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
+                            disp('STOP: SENSOR INPUT');
+                            pause(2); % Let button unpress.
+                            eStopStatus = 0; % 0 - stopped, 1 - primed
+                            while true
+                                pause(0.1);
+                                [axes, buttons, povs] = read(joy);
+                                if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
+                                    disp('RESTART PRIMED');
+                                    eStopStatus = 1;
+                                    pause(2); % Let button unpress.
+                                elseif (buttons(1) == 1) && (eStopStatus == 1)
+                                    disp('RESTART ABORTED');
+                                    eStopStatus = 0;
+                                    pause(2);
+                                elseif (buttons(2) == 1) && (eStopStatus == 1)
+                                    disp('RESTARTING');
+                                    person_Coords = r.model.base*transl(1.7,0,-0.85);
+                                    delete(person_h);
+                                    person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
+                                    break;
+                                end
                             end
                         end
                     end
 
-
-
+                if itemPickup > 0 %% If there's a drink attached to end effector, move it to end effector.
+                    if itemPickup == 1 % Cola
+                        % Delete instance, replot at origin, and transform to end
+                        % effector.
+                        delete(softDrinkCola_h);
+                        softDrinkCola_h = PlaceObject('Items\SoftDrink_Cola.ply'); 
+        
+                        vertices = get(softDrinkCola_h, 'vertices');
+                        verticesAdjustTr = self.model.fkine(qMatrix(i,:))*troty(pi/2)*transl(-0.15,0,0);
+                        transformedVertices = [vertices,ones(size(vertices,1),1)] * verticesAdjustTr'; 
+                        set(softDrinkCola_h, 'vertices', transformedVertices(:,1:3));
+                        drawnow();
+                     elseif itemPickup == 2 % Cutlery
+                        % Delete instance, replot at origin, and transform to end
+                        % effector.
+                        delete(cutlery_h);
+                        cutlery_h = PlaceObject('Items\CutleryContainer.ply'); 
+        
+                        vertices = get(cutlery_h, 'vertices');
+                        verticesAdjustTr = self.model.fkine(qMatrix(i,:))*troty(pi/2)*transl(-0.15,0,0);
+                        transformedVertices = [vertices,ones(size(vertices,1),1)] * verticesAdjustTr'; 
+                        set(cutlery_h, 'vertices', transformedVertices(:,1:3));
+                        drawnow();
+                    elseif itemPickup == 3 % Sauce
+                        % Delete instance, replot at origin, and transform to end
+                        % effector.
+                        delete(sauce_h);
+                        sauce_h = PlaceObject('Items\SauceContainer.ply'); 
+        
+                        vertices = get(sauce_h, 'vertices');
+                        verticesAdjustTr = self.model.fkine(qMatrix(i,:))*troty(pi/2)*transl(-0.15,0,0);
+                        transformedVertices = [vertices,ones(size(vertices,1),1)] * verticesAdjustTr'; 
+                        set(sauce_h, 'vertices', transformedVertices(:,1:3));
+                        drawnow();                          
+                    end
+                end
+                if mealPickup == 1 % Pickup the meal with specified robot.
+                    % Delete instance, replot at origin, and transform to end
+                    % effector.
+                    delete(mealBox_Closed_h);
+                    mealBox_Closed_h = PlaceObject('Items\MealBox_Closed.ply'); 
+        
+                    vertices = get(mealBox_Closed_h, 'vertices');
+                    verticesAdjustTr = self.model.fkine(qMatrix(i,:))*troty(pi)*transl(0,0,-0.15-0.2)*trotz(pi/2)
+                    transformedVertices = [vertices,ones(size(vertices,1),1)] * verticesAdjustTr'; 
+                    set(mealBox_Closed_h, 'vertices', transformedVertices(:,1:3));
+                    drawnow();            
+                end
                 self.model.animate(qMatrix(i,:));
                pause(0.01);
             end
