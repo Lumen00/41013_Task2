@@ -20,7 +20,7 @@ if placeObstacle
     global faces;
     global faceNormals;
     global rect_h;    
-    centrePoint = [0.5, 0.3, 1];
+    centrePoint = [1.5, 0.3, 1];
     plotOptions.plotFaces = true;
     [vertex, faces, faceNormals, rect_h] = RectangularPrism(centrePoint-0.3, centrePoint+0.3, plotOptions);
 end
@@ -278,7 +278,7 @@ person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
     yHighBound = r.model.base(2,4)+2.4;
     yLowBound = r.model.base(2,4)-1;
     hazardFloor_h = surf([xLowBound,xLowBound;xHighBound,xHighBound],[yLowBound,yHighBound;yLowBound,yHighBound],[floor,floor;floor,floor],'CData',imread('Items\hazardFloor.jpg'),'FaceColor','texturemap');
-
+  
 drawnow;
 %% Perform Task
 
@@ -447,6 +447,9 @@ r.Travel(lastPose, q1, 50);
 
 
 %% Navigation for handover of meal box.
+person_Coords = r.model.base*transl(0.7,0,-0.85);
+delete(person_h);
+person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
 delete(mealBox_Open_h);
 delete(softDrinkCola_h);
 delete(cutlery_h);
@@ -456,7 +459,10 @@ mealBox_ClosedCoords = r.model.base*transl(0,-0.55,0);
 global mealBox_Closed_h;
 %delete(mealBox_Closed_h);
 mealBox_Closed_h = PlaceObject('Items\MealBox_Closed.ply', mealBox_ClosedCoords(1:3,4)'); 
-
+person_Coords = r.model.base*transl(1.7,0,-0.85);
+pause(2);
+delete(person_h);
+person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
 % Rozum
 
     % Direct robot to above the rozum and pick up the meal box.
@@ -544,7 +550,7 @@ function RobotControl(joy, robot)
         y = k*axes(2); % up-down on left joystick (y)
         z = k*axes(5); % up-down  on right joystick (z)
         
-        if (buttons(5) == 1) && (jointSelect < 6) % Left bumper goes up.
+        if (buttons(5) == 1) && (jointSelect < robot.model.n) % Left bumper goes up.
             jointSelect = jointSelect + 1;
             fprintf('Selected joint %i\n', jointSelect);
             pause(1);
