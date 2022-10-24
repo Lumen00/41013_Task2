@@ -89,12 +89,13 @@ gripperOffset = 0.15;
 global r;
 r = RozumPulse75();
 r.model.base = r.model.base*transl(0,-0.8,0.85);
-r.model.animate(ones(1,6));
+r.model.animate(zeros(1,6));
 
 global d;
 d = DobotMagician();
 d.model.base = r.model.base*transl(0,0.9,0); % Globally: (x,z,y)
-d.model.animate(zeros(1,5));
+dNeutral = deg2rad([-88, 5, 0, 107, 0]);
+d.model.animate(dNeutral);
 
 % Soft drinks and other items dispenser. 
     % Cola (legally distinct)
@@ -512,37 +513,93 @@ mealPickup = 0;
 DTravel(d, releaseQ, dropoffQ, 20, 1);
 DTravel(d, dropoffQ, dNeutral, 40, 1);
 
+keyboard;
 
+
+%% Robot Jogging
+itemPickup = 0;
+mealPickup = 0;
+RobotControl(joy, r);
+RobotControl(joy, d);
+
+keyboard;
 %% VisualServoing test
 itemPickup = 0;
 mealPickup = 0;
-% VisualServoingSafety(r, d);
+VisualServoingSafety(r, d);
 
-%% Robot Jogging
+%% RobotControl
+function RobotControl(joy, robot)
 
+    [axes, buttons, povs] = read(joy);
+    k = 0.3;
+    q = robot.model.getpos;
+    dt = 0.15;
+    jointSelect = 1;
+    fprintf('Selected joint %i\n', jointSelect);
+    qEditDot = 0;
+    while buttons(3) == 0 % While X is not pressed:
+        [axes, buttons, povs] = read(joy);
+        x = k*axes(1); % left-right on left joystick (x)
+        y = k*axes(2); % up-down on left joystick (y)
+        z = k*axes(5); % up-down  on right joystick (z)
+        
+        if (buttons(5) == 1) && (jointSelect < 6) % Left bumper goes up.
+            jointSelect = jointSelect + 1;
+            fprintf('Selected joint %i\n', jointSelect);
+            pause(1);
+        elseif (buttons(6) == 1) && (jointSelect > 1) % Right bumper goes down.
+            jointSelect = jointSelect - 1;
+            fprintf('Selected joint %i\n', jointSelect);
+            pause(1);
+        end
+        qEditDot = k*axes(3);
+        
+
+        vel = [x, y, z, 0, 0, 0];
+
+        epsilon = 0.1;
+        J = robot.model.jacob0(q);                 % Get Jacobian at current joint state
+        m = sqrt(det(J*J'));
+        if m < epsilon  % If manipulability is less than given threshold
+            lambda = 0.1;
+        else
+            lambda = 0;
+        end
+        invJ = inv(J'*J + lambda *eye(robot.model.n))*J';                   % DLS Inverse        
+    
+        qdot = invJ*vel';
+        qdot(jointSelect) = qdot(jointSelect)+qEditDot;
+        
+        q = q + qdot'*dt;
+    
+        robot.model.animate(q);  
+        pause(0.1);
+    end
+end
 
 %% VisualServoingSafety
 % Start the visual servoing safety demonstration. Note that the camera will
 % clear the figure once the function exits.
 function VisualServoingSafety(r, d)
-    % the Rozum will hold the safety sign that the Dobot has to retreat
-    % from. The Dobot will have a camera mounted to its end effector. It is
-    % assumed it occupies the same space as the Dobot's gripper.
+    % the Dobot will hold the safety sign that the Rozum has to retreat
+    % from. The Rozum will have a camera mounted to its end effector. It is
+    % assumed it occupies the same space as the Rozum's gripper.
 
-    % Load in the safety sign and attach it to the Rozum's end effector at
-    % a pose where the dobot can see it.'
+    % Load in the safety sign and attach it to the Dobot's end effector at
+    % a pose where the Rozum can see it.'
 
-    rozumTargetPose = deg2rad([104, 0, -101, 10.8, 90, 0]);
-    dobotStartPose = [0, deg2rad([90, 40, 10, -51.6, 0])];
+    rozumStartPose = deg2rad([-90, 11.6, 101, 68.4, 90, 0]);
+    dobotTargetPose = deg2rad([-88, 5, 13.5, 161, -85]);
 
     r.Travel(r.model.getpos, zeros(1,6), 40); % Move Rozum to safe pose first.
 
-    UniversalTravel(r, zeros(1,6), rozumTargetPose, [1, 40], d, d.model.getpos, dobotStartPose, [1, 40], 1);
+    UniversalTravel(r, zeros(1,6), rozumStartPose, [1, 40], d, d.model.getpos, dobotTargetPose, [1, 40], 1);
 
     % Now that both robots are in their correct poses, get end effector
-    % position of the Rozum.
+    % position of the Dobot.
 
-    Tr = r.model.fkine(rozumTargetPose);
+    Tr = d.model.fkine(dobotTargetPose);
     
     yConstant = Tr(2,4);
     xHighBound = Tr(1,4)-0.11;
@@ -567,16 +624,16 @@ function VisualServoingSafety(r, d)
     % The desirable transform is the centre of the sign with variable Y. 
 
     signCentre = [Tr(1,4), Tr(2,4), (zHighBound+zLowBound)/2];
-    cameraMount = d.model.fkine(dobotStartPose);
-    depth = cameraMount(2,4)-signCentre(2); % Depth of the IBVS. Distance from camera to points along axis.
+    cameraMount = r.model.fkine(rozumStartPose);
+    depth = abs(cameraMount(2,4)-signCentre(2)); % Depth of the IBVS. Distance from camera to points along axis.
 
-    dobotEndPose = [-0.7, deg2rad([90, 40, 10, -51.6, 0])];
+    rozumEndPose = r.model.ikcon(cameraMount*transl(0,0,-0.5), rozumStartPose);
 
-    Tc0 = transl(signCentre)*trotx(pi/2)*trotz(pi/2)*transl(-0.07,0,-1.3); % DO NOT MOVE IN Y, DOBOT CANNOT HANDLE IT
+    Tc0 = cameraMount*transl(0,0,-0.3);
     trplot(Tc0);
 
     cam.plot_camera('Tcam', cameraMount, 'scale', 0.15);
-
+    
 
     % Create the 2D Image view
     cam.clf();
@@ -599,8 +656,7 @@ function VisualServoingSafety(r, d)
         fps = 25;     % Camera Frame Rate.
         lambda = 0.3; % Controller gain.
 
-    qd = dobotStartPose; % Pose of dobot to modify.
-
+    qr = rozumStartPose; % Pose of rozum to modify.
     % VS Loop will run the following steps:
     % 1. VS to align in starting pose.
     % 2. RMRC to move to retreat coordinates.
@@ -611,7 +667,7 @@ function VisualServoingSafety(r, d)
         % Visual servoing section
 
             % Calculate the simulated depth of the IBVS.
-            depth = cameraMount(2,4)-signCentre(2); % Depth of the IBVS. Distance from camera to points along axis.
+            depth = abs(cameraMount(2,4)-signCentre(2)); % Depth of the IBVS. Distance from camera to points along axis.
 
             % Insert current view of camera in cam.T.
             uv = cam.plot(P)
@@ -640,28 +696,20 @@ function VisualServoingSafety(r, d)
 
             % Compute the Jacobian and inverse Jacobian of the Dobot in its
             % end effector frame.
-            Jd = d.model.jacobn(qd);
+            Jd = r.model.jacobn(qr);
             invJd = pinv(Jd);
 
             % Get the joint velocities of the dobot.
-            qdDot = invJd*v;
+            qrDot = invJd*v;
 
             % Limit maximum angular velocity for robot.
-             ind=find(qdDot(2:end)>2*pi);
+             ind=find(qrDot(:)>2*pi);
              if ~isempty(ind)
-                 qdDot(ind)=2*pi;
+                 qrDot(ind)=2*pi;
              end
-             ind=find(qdDot(2:end)<-2*pi);
+             ind=find(qrDot(:)<-2*pi);
              if ~isempty(ind)
-                 qdDot(ind)=-2*pi;
-             end
-
-             % Limit linear rail velocity.
-             if qdDot(1) > 5
-                 qdDot(1) = 5;
-             end
-             if qdDot(1) < -5
-                 qdDot(1) = -5;
+                 qrDot(ind)=-2*pi;
              end
 
              % Check that all moves are within joint limits. Set
@@ -674,15 +722,15 @@ function VisualServoingSafety(r, d)
 %                  end
 %              end
 
-             % Animate the dobot's joints.
-             qd = qd + (1/fps)*qdDot';
+             % Animate the rozum's joints.
+             qr = qr + (1/fps)*qrDot';
 
-             d.model.animate(qd);
+             r.model.animate(qr);
 
              % Get the new camera location as a result of the dobot's
              % movement.
 
-             cameraMount = d.model.fkine(qd);
+             cameraMount = r.model.fkine(qr);
              cam.T = cameraMount;
              drawnow;
 
@@ -690,9 +738,7 @@ function VisualServoingSafety(r, d)
              pause(1/fps);
            
     end
-    disp("SUCCESS");
-
-    d.model.teach;
+    disp(" VS SUCCESS");
 
     keyboard;
     cam.clf();
@@ -701,6 +747,8 @@ end
 %% UniversalTravel
 % Function to move both robots at once at varying time steps.
 function UniversalTravel(r1_h ,r1q1, r1q2, r1Steps, r2_h, r2q1, r2q2, r2Steps, mode)
+
+global joy;
 
 % Format args as:
 % robot handle, q1, q2, [starting step, steps]... , mode
