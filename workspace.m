@@ -4,7 +4,7 @@ hold on;
 
 %% Set up controller for input (disable if you don't have the joystick)
 global enableJoy
-enableJoy = true;
+enableJoy = false;
 id = 1;
 global joy;
 if enableJoy
@@ -14,13 +14,13 @@ else
 end
 
 %% Plot the collision rectangular prism for dobot. Change its position to test trajectory pathing.
-placeObstacle = true;
+placeObstacle = false;
 if placeObstacle
     global vertex;
     global faces;
     global faceNormals;
     global rect_h;    
-    centrePoint = [1.5, 0.3, 1];
+    centrePoint = [0.5, 0.3, 1];
     plotOptions.plotFaces = true;
     [vertex, faces, faceNormals, rect_h] = RectangularPrism(centrePoint-0.3, centrePoint+0.3, plotOptions);
 end
@@ -94,7 +94,7 @@ r.model.animate(zeros(1,6));
 global d;
 d = DobotMagician();
 d.model.base = r.model.base*transl(0,0.9,0); % Globally: (x,z,y)
-dNeutral = deg2rad([-88, 5, 0, 107, 0]);
+dNeutral = deg2rad([-88, 5, 40, 137, 0]);
 d.model.animate(dNeutral);
 
 % Soft drinks and other items dispenser. 
@@ -486,7 +486,7 @@ person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
 
 % Dobot
     % Navigate to neutral pose
-    dNeutral = deg2rad([-88, 5, 0, 107, 0]);
+    dNeutral = deg2rad([-88, 5, 40, 137, 0]);
     DTravel(d, d.model.getpos, dNeutral, 50, 1);
 
     % Build pickup transform. 
@@ -636,7 +636,7 @@ function VisualServoingSafety(r, d)
     rozumEndPose = r.model.ikcon(cameraMount*transl(0,0,-0.5), rozumStartPose);
 
     Tc0 = cameraMount*transl(0,0,-0.3);
-    trplot(Tc0);
+    %trplot(Tc0);
 
     cam.plot_camera('Tcam', cameraMount, 'scale', 0.15);
     
