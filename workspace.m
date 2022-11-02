@@ -4,7 +4,7 @@ hold on;
 
 %% Set up controller for input (disable if you don't have the joystick)
 global enableJoy
-enableJoy = false;
+enableJoy = true;
 id = 1;
 global joy;
 if enableJoy
@@ -58,14 +58,8 @@ mealPickup = 0;
 %DTravel(d, q1, q2, 1);
 
 %% GENERAL TO DO LIST:
-% - Visual servoing
 % - Collision detection
 % - GUI Movement/Controller Movement
-% - Plan meal packaging
-    % + Passing between robots
-% - Create pickup status for each robot and each item to indicate what each
-% robot is holding. Travel functions will check for each robots' status and
-% move whatever is set to true.
 
 
 %% Gripper plotting
@@ -279,6 +273,21 @@ person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
     yLowBound = r.model.base(2,4)-1;
     hazardFloor_h = surf([xLowBound,xLowBound;xHighBound,xHighBound],[yLowBound,yHighBound;yLowBound,yHighBound],[floor,floor;floor,floor],'CData',imread('Items\hazardFloor.jpg'),'FaceColor','texturemap');
   
+% Counter collision plane.
+% We need:
+% - Robot Handle
+% - q
+%   + Use GetLinkPoses to get the transform for every link. We can extract
+%   start and end points using this.
+
+% - Link start point - tr(i)
+% - Link end point - tr(i+1)
+
+% - plane normal - [0, 0, 1], pointing in the upwards z.
+% - point on plane - transl(r.model.base)';
+
+
+
 drawnow;
 %% Perform Task
 
@@ -311,9 +320,9 @@ qPickup = r.model.ikcon(softDrinkTr, qApproach);
 
 % Complete pickup travel moves.
 
-r.Travel(q1, qApproach , 50);
+r.Travel(q1, qApproach , 30);
 
-r.Travel(qApproach, qPickup, 30);
+r.Travel(qApproach, qPickup, 15);
 
 % Take the pickup transform and lift it by 0.1 m in the local x.
 drinkLiftTr = softDrinkTr*transl(0.1,0,0);
@@ -328,19 +337,19 @@ qGuess = deg2rad([80, 20, 90, -20, -90, 0]);
 
 % Move the soft drink out of the dispenser. Use RMRC to control velocity.
 itemPickup = 1;
-lastPose = RMRC(r, softDrinkTr, drinkLiftTr, qPickup, 40, 0.2);
+lastPose = RMRC(r, softDrinkTr, drinkLiftTr, qPickup, 10, 0.2);
 
 % Move the soft drink to over the meal box.
 qAbove = r.model.ikcon(drinkBoxAboveTr, qGuess);
-r.Travel(lastPose, qAbove, 100);
+r.Travel(lastPose, qAbove, 30);
 
 % Move the soft drink into the meal box and deposit it. Use RMRC to control
 % velocity.
-lastPose = RMRC(r, drinkBoxAboveTr, drinkBoxAboveTr*transl(0,0,0.5), qAbove, 40, 0.2);
+lastPose = RMRC(r, drinkBoxAboveTr, drinkBoxAboveTr*transl(0,0,0.5), qAbove, 15, 0.2);
 itemPickup = 0;
 
 % Move the robot out of the box.
-lastPose = RMRC(r, drinkBoxAboveTr*transl(0,0,0.5), drinkBoxAboveTr, lastPose, 40, 0.2);
+lastPose = RMRC(r, drinkBoxAboveTr*transl(0,0,0.5), drinkBoxAboveTr, lastPose, 15, 0.2);
 
 % Return to neutral pose.
 
@@ -367,7 +376,7 @@ qPickup = r.model.ikcon(cutleryTr, qApproach);
 
 % Complete pickup travel moves.
 
-r.Travel(q1, qApproach , 50);
+r.Travel(q1, qApproach , 30);
 
 r.Travel(qApproach, qPickup, 30);
 
@@ -376,7 +385,7 @@ r.Travel(qApproach, qPickup, 30);
 itemPickup = 2;
 cutleryLiftTr = cutleryTr*transl(0.1,0,0);
 
-lastPose = RMRC(r, cutleryTr, cutleryLiftTr, qPickup, 40, 0.2);
+lastPose = RMRC(r, cutleryTr, cutleryLiftTr, qPickup, 10, 0.2);
 
 % Move to above box.
 qGuess = deg2rad([80, 20, 90, -20, -90, 0]);
@@ -384,17 +393,17 @@ qGuess = deg2rad([80, 20, 90, -20, -90, 0]);
 cutleryBoxAboveTr = mealBox_OpenCoords*transl(0,0,0.35)*trotx(pi)*trotz(pi/2);
 
 qAbove = r.model.ikcon(cutleryBoxAboveTr, qGuess);
-r.Travel(lastPose, qAbove, 100);
+r.Travel(lastPose, qAbove, 30);
 
 % Insert into box and release
-lastPose = RMRC(r, cutleryBoxAboveTr, cutleryBoxAboveTr*transl(0,0,0.5), qAbove, 40, 0.2);
+lastPose = RMRC(r, cutleryBoxAboveTr, cutleryBoxAboveTr*transl(0,0,0.5), qAbove, 10, 0.2);
 itemPickup = 0;
 
 % Move out of box
-lastPose = RMRC(r, cutleryBoxAboveTr*transl(0,0,0.5), cutleryBoxAboveTr, lastPose, 40, 0.2);
+lastPose = RMRC(r, cutleryBoxAboveTr*transl(0,0,0.5), cutleryBoxAboveTr, lastPose, 10, 0.2);
 
 % Return to neutral pose.
-r.Travel(lastPose, q1, 50);
+r.Travel(lastPose, q1, 30);
 
 %% Navigation for ROZUM picking up sauce
 % Transform of sauce container's attach point.
@@ -416,7 +425,7 @@ qPickup = r.model.ikcon(sauceTr, qApproach);
 
 % Complete pickup travel moves.
 
-r.Travel(q1, qApproach , 50);
+r.Travel(q1, qApproach , 30);
 
 r.Travel(qApproach, qPickup, 30);
 
@@ -425,7 +434,7 @@ r.Travel(qApproach, qPickup, 30);
 itemPickup = 3;
 sauceLiftTr = sauceTr*transl(0.1,0,0);
 
-lastPose = RMRC(r, sauceTr, sauceLiftTr, qPickup, 40, 0.2);
+lastPose = RMRC(r, sauceTr, sauceLiftTr, qPickup, 10, 0.2);
 
 % Move to above box.
 qGuess = deg2rad([80, 20, 90, -20, -90, 0]);
@@ -433,17 +442,17 @@ qGuess = deg2rad([80, 20, 90, -20, -90, 0]);
 sauceBoxAboveTr = mealBox_OpenCoords*transl(-0.07,0,0.35)*trotx(pi)*trotz(pi/2);
 
 qAbove = r.model.ikcon(sauceBoxAboveTr, qGuess);
-r.Travel(lastPose, qAbove, 100);
+r.Travel(lastPose, qAbove, 30);
 
 % Insert into box and release
-lastPose = RMRC(r, sauceBoxAboveTr, sauceBoxAboveTr*transl(0,0,0.5), qAbove, 40, 0.2);
+lastPose = RMRC(r, sauceBoxAboveTr, sauceBoxAboveTr*transl(0,0,0.5), qAbove, 15, 0.2);
 itemPickup = 0;
 
 % Move out of box
-lastPose = RMRC(r, sauceBoxAboveTr*transl(0,0,0.5), sauceBoxAboveTr, lastPose, 40, 0.2);
+lastPose = RMRC(r, sauceBoxAboveTr*transl(0,0,0.5), sauceBoxAboveTr, lastPose, 15, 0.2);
 
 % Return to neutral pose.
-r.Travel(lastPose, q1, 50);
+r.Travel(lastPose, q1, 30);
 
 
 %% Navigation for handover of meal box.
@@ -470,24 +479,24 @@ person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
     mealBoxPickupTr = mealBox_ClosedCoords*transl(0,0,0.175+0.1+gripperOffset)*trotx(pi)*trotz(pi/2);
     mealBoxPpickupQ = r.model.ikcon(mealBoxPickupTr, lastPose);
 
-    r.Travel(zeros(1,6), mealBoxPpickupQ, 60);
-    lastPoseQ = RMRC(r, mealBoxPickupTr, mealBoxPickupTr*transl(0,0,0.1), mealBoxPpickupQ, 30, 0.2);
+    r.Travel(zeros(1,6), mealBoxPpickupQ, 30);
+    lastPoseQ = RMRC(r, mealBoxPickupTr, mealBoxPickupTr*transl(0,0,0.1), mealBoxPpickupQ, 10, 0.2);
     mealPickup = 1;
-    lastPoseQ = RMRC(r, mealBoxPickupTr*transl(0,0,0.1), mealBoxPickupTr, lastPoseQ, 30, 0.2);
+    lastPoseQ = RMRC(r, mealBoxPickupTr*transl(0,0,0.1), mealBoxPickupTr, lastPoseQ, 10, 0.2);
 
     % Swivel robot 180 degrees.
-    r.Travel(lastPoseQ, [(lastPoseQ(1) +pi) ,lastPoseQ(2:end)], 50);
+    r.Travel(lastPoseQ, [(lastPoseQ(1) +pi) ,lastPoseQ(2:end)], 30);
     
     mealBoxHandoverTr = r.model.fkine([(lastPoseQ(1) +pi) ,lastPoseQ(2:end)]);
     
-    lastPoseQ = RMRC(r, mealBoxHandoverTr, mealBoxHandoverTr*transl(0.3,0,0), [(lastPoseQ(1) +pi) ,lastPoseQ(2:end)], 30, 0.2);
+    lastPoseQ = RMRC(r, mealBoxHandoverTr, mealBoxHandoverTr*transl(0.3,0,0), [(lastPoseQ(1) +pi) ,lastPoseQ(2:end)], 10, 0.2);
     mealPickup = 0;
 %%
 
 % Dobot
     % Navigate to neutral pose
     dNeutral = deg2rad([-88, 5, 40, 137, 0]);
-    DTravel(d, d.model.getpos, dNeutral, 50, 1);
+    DTravel(d, d.model.getpos, dNeutral, 20, 1);
 
     % Build pickup transform. 
     handOverTr = r.model.fkine(lastPoseQ); 
@@ -495,9 +504,9 @@ person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
 
     pickupQ = deg2rad([-88, 20, 52.6, 107, 0]);
        
-    DTravel(d, dNeutral, pickupQ, 50, 1);
+    DTravel(d, dNeutral, pickupQ, 20, 1);
     mealPickup = 0;
-    r.Travel(lastPoseQ, q1, 40); % Return to neutral pose.
+    r.Travel(lastPoseQ, q1, 30); % Return to neutral pose.
 
     mealPickup = 1;
 
@@ -506,7 +515,7 @@ person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
 
 dropoffQ = [(pickupQ(1)+pi), pickupQ(2:end)]; %d.model.ikcon(dropoffTr, pickupQ);
 dropoffTr = d.model.fkine(dropoffQ);
-DTravel(d, pickupQ, dropoffQ, 50, 1);
+DTravel(d, pickupQ, dropoffQ, 20, 1);
 
 % RMRC to lower and leave the meal box.
 releaseTr = d.model.fkine(dropoffQ)*transl(0,0,-0.02);
@@ -514,10 +523,9 @@ releaseQ = d.model.ikcon(releaseTr, dropoffQ);
 
 DTravel(d, dropoffQ, releaseQ, 20, 1);
 
-%DTravel(d, pickup, dropoff1, 50, 1);
 mealPickup = 0;
 DTravel(d, releaseQ, dropoffQ, 20, 1);
-DTravel(d, dropoffQ, dNeutral, 40, 1);
+DTravel(d, dropoffQ, dNeutral, 20, 1);
 
 keyboard;
 
@@ -525,8 +533,10 @@ keyboard;
 %% Robot Jogging
 itemPickup = 0;
 mealPickup = 0;
-RobotControl(joy, r);
-RobotControl(joy, d);
+if enableJoy
+    RobotControl(joy, r);
+    RobotControl(joy, d);
+end
 
 keyboard;
 %% VisualServoing test
@@ -536,6 +546,7 @@ VisualServoingSafety(r, d);
 
 %% RobotControl
 function RobotControl(joy, robot)
+    global r;
 
     [axes, buttons, povs] = read(joy);
     k = 0.3;
@@ -561,24 +572,42 @@ function RobotControl(joy, robot)
         end
         qEditDot = k*axes(3);
         
-
         vel = [x, y, z, 0, 0, 0];
 
         epsilon = 0.1;
-        J = robot.model.jacob0(q);                 % Get Jacobian at current joint state
+        J = robot.model.jacob0(q);    % Get Jacobian at current joint state
         m = sqrt(det(J*J'));
         if m < epsilon  % If manipulability is less than given threshold
             lambda = 0.1;
         else
             lambda = 0;
         end
-        invJ = inv(J'*J + lambda *eye(robot.model.n))*J';                   % DLS Inverse        
+        invJ = inv(J'*J + lambda *eye(robot.model.n))*J';    % DLS Inverse        
     
         qdot = invJ*vel';
         qdot(jointSelect) = qdot(jointSelect)+qEditDot;
         
-        q = q + qdot'*dt;
+        qTemp = q + qdot'*dt;
     
+        % Check that the robot's links are not in collision with the
+        % counter using linePlaneIntersection and GetLinkPoses.
+
+        linkTr = GetLinkPoses(qTemp, robot);
+
+        check = 0;
+        for i=1:size(linkTr,3)-1 % For each link, check for collision.
+            [intersectPoint, check] = LinePlaneIntersection([0,0,1], transl(r.model.base)'-[0,0,0.01], linkTr(1:3,4,i)', linkTr(1:3,4,i+1)');
+            if check==1 || check==2 % If there is a collision, break out of loop.
+                disp('Collision!');
+                break
+            end
+        end
+        if check==1 || check == 2
+            continue
+        else
+             q = qTemp; % Approve the pose if not in collision. .
+        end
+
         robot.model.animate(q);  
         pause(0.1);
     end
@@ -660,7 +689,7 @@ function VisualServoingSafety(r, d)
         
         % Set VS parameters:
         fps = 25;     % Camera Frame Rate.
-        lambda = 0.3; % Controller gain.
+        lambda = 0.5; % Controller gain.
 
     qr = rozumStartPose; % Pose of rozum to modify.
     % VS Loop will run the following steps:
@@ -755,6 +784,7 @@ end
 function UniversalTravel(r1_h ,r1q1, r1q2, r1Steps, r2_h, r2q1, r2q2, r2Steps, mode)
 
 global joy;
+global enableJoy;
 
 % Format args as:
 % robot handle, q1, q2, [starting step, steps]... , mode
@@ -818,55 +848,57 @@ global joy;
             % 2. Sensing of personnel in hazard zone. 
             
                 % Read controller input (Using XBONE configuration)
-                [axes, buttons, povs] = read(joy);
-                
-                % Press A (button 1) to stop movement and enter infinite
-                % loop. Press A (button 1) to prime restart. Press B 
-                % (button 2) to restart movement.
-                if buttons(1) == 1 % STOP
-                    disp('STOP: USER INPUT');
-                    pause(2); % Let button unpress.
-                    eStopStatus = 0; % 0 - stopped, 1 - primed
-                    while true
-                        pause(0.1);
-                        [axes, buttons, povs] = read(joy);
-                        if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
-                            disp('RESTART PRIMED');
-                            eStopStatus = 1;
-                            pause(2); % Let button unpress.
-                        elseif (buttons(1) == 1) && (eStopStatus == 1)
-                            disp('RESTART ABORTED');
-                            eStopStatus = 0;
-                            pause(2);
-                        elseif (buttons(2) == 1) && (eStopStatus == 1)
-                            disp('RESTARTING');
-                            break;
+                if enableJoy
+                    [axes, buttons, povs] = read(joy);
+                    
+                    % Press A (button 1) to stop movement and enter infinite
+                    % loop. Press A (button 1) to prime restart. Press B 
+                    % (button 2) to restart movement.
+                    if buttons(1) == 1 % STOP
+                        disp('STOP: USER INPUT');
+                        pause(2); % Let button unpress.
+                        eStopStatus = 0; % 0 - stopped, 1 - primed
+                        while true
+                            pause(0.1);
+                            [axes, buttons, povs] = read(joy);
+                            if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
+                                disp('RESTART PRIMED');
+                                eStopStatus = 1;
+                                pause(2); % Let button unpress.
+                            elseif (buttons(1) == 1) && (eStopStatus == 1)
+                                disp('RESTART ABORTED');
+                                eStopStatus = 0;
+                                pause(2);
+                            elseif (buttons(2) == 1) && (eStopStatus == 1)
+                                disp('RESTARTING');
+                                break;
+                            end
                         end
-                    end
-                elseif buttons(4) == 1% Press Y to move lego man into hazard zone and stop robots.
-                    person_Coords = r.model.base*transl(0.7,0,-0.85);
-                    delete(person_h);
-                    person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
-                    disp('STOP: SENSOR INPUT');
-                    pause(2); % Let button unpress.
-                    eStopStatus = 0; % 0 - stopped, 1 - primed
-                    while true
-                        pause(0.1);
-                        [axes, buttons, povs] = read(joy);
-                        if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
-                            disp('RESTART PRIMED');
-                            eStopStatus = 1;
-                            pause(2); % Let button unpress.
-                        elseif (buttons(1) == 1) && (eStopStatus == 1)
-                            disp('RESTART ABORTED');
-                            eStopStatus = 0;
-                            pause(2);
-                        elseif (buttons(2) == 1) && (eStopStatus == 1)
-                            disp('RESTARTING');
-                            person_Coords = r.model.base*transl(1.7,0,-0.85);
-                            delete(person_h);
-                            person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
-                            break;
+                    elseif buttons(4) == 1% Press Y to move lego man into hazard zone and stop robots.
+                        person_Coords = r.model.base*transl(0.7,0,-0.85);
+                        delete(person_h);
+                        person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
+                        disp('STOP: SENSOR INPUT');
+                        pause(2); % Let button unpress.
+                        eStopStatus = 0; % 0 - stopped, 1 - primed
+                        while true
+                            pause(0.1);
+                            [axes, buttons, povs] = read(joy);
+                            if (buttons(1) == 1) && (eStopStatus == 0) % Prime restart with A
+                                disp('RESTART PRIMED');
+                                eStopStatus = 1;
+                                pause(2); % Let button unpress.
+                            elseif (buttons(1) == 1) && (eStopStatus == 1)
+                                disp('RESTART ABORTED');
+                                eStopStatus = 0;
+                                pause(2);
+                            elseif (buttons(2) == 1) && (eStopStatus == 1)
+                                disp('RESTARTING');
+                                person_Coords = r.model.base*transl(1.7,0,-0.85);
+                                delete(person_h);
+                                person_h = PlaceObject('Items\lego man.ply', person_Coords(1:3,4)');
+                                break;
+                            end
                         end
                     end
                 end
